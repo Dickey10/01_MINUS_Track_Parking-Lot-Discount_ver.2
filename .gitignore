@@ -1,0 +1,15 @@
+.env
+data/storage_state.json
+data/gsheet_creds.json
+data/screenshots/
+data/*.db
+data/*.db-*
+data/*.log
+__pycache__/
+*.pyc
+.venv/
+*.docx
+*.zip
+.pytest_cache/
+app/ats/session/
+app/ats/screenshots/

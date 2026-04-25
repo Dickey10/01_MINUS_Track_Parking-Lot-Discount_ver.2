@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ATS Parking Discount</title>
+  <style>
+    :root { --bg:#f6f7f9; --panel:#fff; --ink:#111827; --line:#d7dce3; --blue:#2563eb; --red:#c03221; --green:#12805c; --amber:#a15c00; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial,"Malgun Gothic",sans-serif; color:var(--ink); background:var(--bg); }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 22px; background:#1f2937; color:white; }
+    header h1 { margin:0; font-size:18px; }
+    main { max-width:1380px; margin:0 auto; padding:18px; }
+    .login, section, nav { background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+    .login { max-width:420px; margin:8vh auto; padding:24px; }
+    .layout { display:grid; grid-template-columns:230px 1fr; gap:16px; }
+    nav { padding:10px; align-self:start; }
+    nav button { width:100%; margin:4px 0; padding:10px 12px; border:0; border-radius:6px; background:transparent; color:var(--ink); text-align:left; cursor:pointer; font-weight:700; }
+    nav button.active { background:#e8f1ff; color:#0f4fb8; }
+    section { display:none; padding:18px; }
+    section.active { display:block; }
+    h2 { margin:0 0 14px; font-size:19px; }
+    h3 { margin:18px 0 10px; font-size:15px; }
+    label { display:block; font-size:13px; font-weight:700; color:#344054; }
+    input, select { width:100%; margin-top:6px; padding:10px; border:1px solid var(--line); border-radius:6px; background:white; color:var(--ink); }
+    button { border:0; border-radius:6px; padding:10px 14px; background:var(--blue); color:white; cursor:pointer; font-weight:700; }
+    button.ghost { background:#eef2f6; color:var(--ink); }
+    button.danger { background:var(--red); }
+    .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .message { display:none; margin:14px 0; padding:12px; border-radius:6px; border:1px solid transparent; white-space:pre-wrap; }
+    .message.show { display:block; }
+    .ok { color:var(--green); background:#eaf8f1; border-color:#b7e4d0; }
+    .bad { color:var(--red); background:#fff0ed; border-color:#ffc8bd; }
+    .note { color:var(--amber); background:#fff7e8; border-color:#f3d19c; }
+    .excel-wrap { overflow:auto; border:1px solid var(--line); border-radius:8px; background:white; }
+    table.excel { width:100%; min-width:1120px; border-collapse:collapse; font-size:13px; }
+    .excel th, .excel td { border:1px solid var(--line); padding:8px; vertical-align:middle; text-align:left; }
+    .excel th { background:#eef2f6; position:sticky; top:0; z-index:1; }
+    .excel tfoot td { background:#fff7e8; font-weight:700; }
+    .filter-row th { background:#f8fafc; top:37px; }
+    .filter-row select { min-width:110px; margin:0; padding:7px; }
+    .col-toggle { display:flex; align-items:center; gap:5px; white-space:nowrap; }
+    .col-toggle input { width:auto; margin:0; }
+    .succeeded { color:var(--green); font-weight:700; }
+    .pending { color:var(--amber); font-weight:700; }
+    .failed, .inactive { color:var(--red); font-weight:700; }
+    .hidden { display:none!important; }
+    @media (max-width:860px) { .layout,.form-grid,.three { grid-template-columns:1fr; } main{padding:10px;} header{align-items:flex-start; flex-direction:column;} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ATS Parking Discount</h1>
+    <div id="userBar" class="hidden"><span id="userName"></span> <button class="ghost" onclick="logout()">Logout</button></div>
+  </header>
+  <main>
+    <div id="loginView" class="login">
+      <h2>Login</h2>
+      <label>ID<input id="loginUsername" autocomplete="username" value="admin"></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" value="admin1234"></label>
+      <div class="actions"><button onclick="login()">Login</button></div>
+      <div id="loginMsg" class="message"></div>
+    </div>
+
+    <div id="appView" class="layout hidden">
+      <nav>
+        <button data-tab="apply" class="active" onclick="showTab('apply')">Discount Request</button>
+        <button data-tab="history" onclick="showTab('history')">History / Stats</button>
+        <button data-tab="manual" onclick="showTab('manual')">Manual Apply</button>
+        <button data-tab="accounts" class="admin-only" onclick="showTab('accounts')">Accounts</button>
+        <button data-tab="departments" class="admin-only" onclick="showTab('departments')">Departments</button>
+        <button data-tab="emails" class="admin-only" onclick="showTab('emails')">Result Emails</button>
+      </nav>
+      <div>
+        <section id="tab-apply" class="active">
+          <h2>Visitor Parking Discount Request</h2>
+          <div class="form-grid">
+            <label>Car Number<input id="carNumber" placeholder="12A3456"></label>
+            <label>Entry Time<input id="entryTime" type="datetime-local"></label>
+            <label>Department<select id="dept"></select></label>
+            <label>Requester<input id="requester" placeholder="Name"></label>
+            <label>Visitor Company<input id="visitorCompany" placeholder="Company"></label>
+            <label>Visit Purpose<input id="visitPurpose" placeholder="Meeting"></label>
+            <label>Mode<select id="autoApply"><option value="true">Apply to ATS</option><option value="false">Save only</option></select></label>
+          </div>
+          <div class="actions"><button onclick="createApplication()">Submit</button><button class="ghost" onclick="previewDiscount()">Preview Coupons</button></div>
+          <div id="applyMsg" class="message"></div>
+        </section>
+
+        <section id="tab-history">
+          <h2>History / Usage Statistics</h2>
+          <p class="note message show">Default view shows only pending requests and completed registrations. Failed connection/registration rows are excluded.</p>
+          <div class="excel-wrap">
+            <table class="excel" id="historyTable">
+              <thead><tr id="columnToggles"></tr><tr class="filter-row" id="columnFilters"></tr><tr id="historyHead"></tr></thead>
+              <tbody id="historyRows"></tbody>
+              <tfoot><tr id="historyTotals"></tr></tfoot>
+            </table>
+          </div>
+        </section>
+
+        <section id="tab-manual">
+          <h2>Manual Apply</h2>
+          <div class="form-grid">
+            <label>Application ID<input id="manualId" type="number"></label>
+            <label>Reason<input id="manualReason" value="Applied manually in ATS"></label>
+            <label>Elapsed Minutes<input id="manualMinutes" type="number" placeholder="Optional"></label>
+          </div>
+          <div class="actions"><button onclick="manualApply()">Mark Manual Complete</button></div>
+          <div id="manualMsg" class="message"></div>
+        </section>
+
+        <section id="tab-accounts" class="admin-only">
+          <h2>Account Management</h2>
+          <div class="form-grid three">
+            <label>ID<input id="accountUsername"></label>
+            <label>Initial Password<input id="accountPassword" type="password" placeholder="8+ characters"></label>
+            <label>Display Name<input id="accountName"></label>
+            <label>Division<select id="accountDivision"></select></label>
+            <label>Department<select id="accountDept"></select></label>
+            <label>Role<select id="accountRole"><option value="super_admin">Super Admin</option><option value="division_admin">Division Admin</option><option value="user" selected>User</option><option value="inactive">Inactive</option></select></label>
+          </div>
+          <div class="actions"><button onclick="createAccount()">Save Account</button></div>
+          <h3>Add Dropdown Values</h3>
+          <div class="form-grid">
+            <label>New Division<input id="divisionName" placeholder="Management Division"></label>
+            <label>New Department<input id="departmentNameInline" placeholder="Management Team"></label>
+          </div>
+          <div class="actions"><button class="ghost" onclick="createDivision()">Add Division</button><button class="ghost" onclick="createDepartmentInline()">Add Department</button></div>
+          <div id="accountMsg" class="message"></div>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>Username</th><th>Name</th><th>Division</th><th>Department</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody id="accountRows"></tbody></table></div>
+        </section>
+
+        <section id="tab-departments" class="admin-only">
+          <h2>Department Management</h2>
+          <div class="form-grid"><label>Department Name<input id="departmentName"></label></div>
+          <div class="actions"><button onclick="createDepartment()">Add Department</button></div>
+          <div id="departmentMsg" class="message"></div>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead><tbody id="departmentRows"></tbody></table></div>
+        </section>
+
+        <section id="tab-emails" class="admin-only">
+          <h2>Result Email Recipients</h2>
+          <div class="form-grid"><label>Email<input id="emailAddress" type="email"></label><label>Name<input id="emailName" placeholder="General Affairs"></label></div>
+          <div class="actions"><button onclick="createEmail()">Add Email</button></div>
+          <div id="emailMsg" class="message"></div>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Action</th></tr></thead><tbody id="emailRows"></tbody></table></div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <script>
+    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [] };
+    const roleLabels = { super_admin:"Super Admin", admin:"Super Admin", division_admin:"Division Admin", user:"User", manager:"User", inactive:"Inactive" };
+    const statusLabels = { pending:"Pending", succeeded:"Completed" };
+    const columns = [["id","ID"],["status","Status"],["car_number","Car"],["division","Division"],["dept","Department"],["requester","Requester"],["visitor_company","Company"],["visit_purpose","Purpose"],["entry_time","Entry Time"],["effective_minutes","Total Minutes"],["coupon_60_count","60m"],["coupon_30_count","30m"],["email_status","Email"],["failure_reason","Failure"]];
+    function headers(){ return { "Content-Type":"application/json", "Authorization":`Bearer ${state.token}` }; }
+    async function api(path, options={}){ const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}}); const text=await res.text(); let data={}; try{data=text?JSON.parse(text):{};}catch{data={detail:text||res.statusText};} if(!res.ok) throw new Error(data.detail||data.message||res.statusText); return data; }
+    function msg(id,text,type="ok"){ const el=document.getElementById(id); el.className=`message show ${type}`; el.textContent=text; }
+    function esc(v){ return String(v ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+    function unique(values){ return [...new Set(values.filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(String))].sort(); }
+    async function login(){ try{ const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:loginUsername.value.trim(),password:loginPassword.value})}); const data=await res.json(); if(!res.ok) throw new Error(data.detail||"Login failed"); state.token=data.token; state.user=data.user; localStorage.setItem("atsToken",state.token); await enterApp(); }catch(e){ msg("loginMsg",e.message,"bad"); } }
+    function logout(){ localStorage.removeItem("atsToken"); location.reload(); }
+    async function enterApp(){ if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!["super_admin","admin"].includes(state.user.role))); setDefaultEntryTime(); await Promise.all([loadDivisions(),loadDepartments(),loadStats()]); if(["super_admin","admin"].includes(state.user.role)) await Promise.all([loadAccounts(),loadEmails()]); }
+    function showTab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name)); document.querySelectorAll("section").forEach(s=>s.classList.toggle("active",s.id===`tab-${name}`)); }
+    function setDefaultEntryTime(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); entryTime.value=d.toISOString().slice(0,16); }
+    function buildApplicationPayload(){ return { car_number:carNumber.value.trim(), entry_time:entryTime.value?new Date(entryTime.value).toISOString():null, dept:dept.value, requester:requester.value.trim(), visitor_company:visitorCompany.value.trim(), visit_purpose:visitPurpose.value.trim(), auto_apply:autoApply.value==="true" }; }
+    function previewDiscount(){ if(!entryTime.value) return msg("applyMsg","Enter entry time.","bad"); const elapsed=Math.max(0,Math.ceil((Date.now()-new Date(entryTime.value).getTime())/60000)); const effective=elapsed+10, units=Math.max(1,Math.floor((effective+10)/30)+1), c60=Math.floor(units/2), c30=units%2; msg("applyMsg",`Elapsed ${elapsed}m + exit buffer 10m = ${effective}m\n60m coupons: ${c60}, 30m coupons: ${c30}`,"note"); }
+    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("Enter car number."); if(!requester.value.trim()) throw new Error("Enter requester."); if(!visitPurpose.value.trim()) throw new Error("Enter visit purpose."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`Saved #${app.id}\nStatus: ${statusLabels[app.status]||app.status}\n60m: ${app.coupon_60_count}, 30m: ${app.coupon_30_count}${app.failure_reason ? "\nReason: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    async function loadStats(){ const params=new URLSearchParams(); document.querySelectorAll(".filter-select").forEach(sel=>{ if(sel.value) params.set(sel.dataset.key,sel.value); }); const data=await api(`/api/stats?${params}`); state.rows=data.items; renderHistory(data); }
+    function renderHistory(data){ columnToggles.innerHTML=columns.map(([k,l])=>`<th><label class="col-toggle"><input type="checkbox" checked data-col="${k}" onchange="renderHistoryFromState()"> ${l}</label></th>`).join(""); historyHead.innerHTML=columns.map(([k,l])=>`<th data-col="${k}">${l}</th>`).join(""); columnFilters.innerHTML=columns.map(([k])=>{ const filterable=["status","division","dept","requester","visitor_company","visit_purpose","email_status"].includes(k); if(!filterable) return `<th data-col="${k}"></th>`; const values=unique(state.rows.map(r=>r[k])); return `<th data-col="${k}"><select class="filter-select" data-key="${k}" onchange="loadStats()"><option value="">All</option>${values.map(v=>`<option value="${esc(v)}">${esc(statusLabels[v]||v)}</option>`).join("")}</select></th>`; }).join(""); renderHistoryFromState(data); }
+    function renderHistoryFromState(data=null){ const visible=new Set([...document.querySelectorAll("#columnToggles input")].filter(i=>i.checked).map(i=>i.dataset.col)); historyRows.innerHTML=state.rows.map(row=>`<tr>${columns.map(([k])=>`<td data-col="${k}" class="${esc(row[k])}">${esc(statusLabels[row[k]]||row[k])}</td>`).join("")}</tr>`).join(""); const summary=data||{count:state.rows.length,subtotal_effective_minutes:state.rows.reduce((s,r)=>s+r.effective_minutes,0),coupon_60_count:state.rows.reduce((s,r)=>s+r.coupon_60_count,0),coupon_30_count:state.rows.reduce((s,r)=>s+r.coupon_30_count,0)}; historyTotals.innerHTML=columns.map(([k])=>{ let v=""; if(k==="id") v=`Count ${summary.count}`; if(k==="effective_minutes") v=`Subtotal ${summary.subtotal_effective_minutes}m`; if(k==="coupon_60_count") v=`${summary.coupon_60_count}`; if(k==="coupon_30_count") v=`${summary.coupon_30_count}`; return `<td data-col="${k}">${v}</td>`; }).join(""); document.querySelectorAll("[data-col]").forEach(el=>el.classList.toggle("hidden",!visible.has(el.dataset.col))); }
+    async function manualApply(){ try{ const minutes=manualMinutes.value; const data=await api(`/api/applications/${manualId.value}/manual-apply`,{method:"POST",body:JSON.stringify({reason:manualReason.value,effective_minutes:minutes?Number(minutes):null})}); msg("manualMsg",`Manual complete #${data.id}`,"ok"); await loadStats(); }catch(e){ msg("manualMsg",e.message,"bad"); } }
+    function fillSelect(el, rows, fallback){ el.innerHTML=rows.filter(r=>r.is_active).map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join("")||`<option value="${esc(fallback)}">${esc(fallback)}</option>`; }
+    async function loadDivisions(){ state.divisions=await api("/api/divisions"); fillSelect(accountDivision,state.divisions,"Management Division"); }
+    async function loadDepartments(){ state.departments=await api("/api/departments"); fillSelect(dept,state.departments,"General Affairs"); fillSelect(accountDept,state.departments,"Management Team"); departmentRows.innerHTML=state.departments.map(r=>`<tr><td>${r.id}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteDepartment(${r.id})">Delete</button></td></tr>`).join(""); }
+    async function createDivision(){ try{ if(!divisionName.value.trim()) throw new Error("Enter division name."); await api("/api/divisions",{method:"POST",body:JSON.stringify({name:divisionName.value.trim()})}); divisionName.value=""; await loadDivisions(); msg("accountMsg","Division saved.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
+    async function createDepartmentInline(){ departmentName.value=departmentNameInline.value; await createDepartment("accountMsg"); departmentNameInline.value=""; }
+    async function createDepartment(messageId="departmentMsg"){ try{ if(!departmentName.value.trim()) throw new Error("Enter department name."); await api("/api/departments",{method:"POST",body:JSON.stringify({name:departmentName.value.trim()})}); departmentName.value=""; await loadDepartments(); msg(messageId,"Department saved.","ok"); }catch(e){ msg(messageId,e.message,"bad"); } }
+    async function deleteDepartment(id){ try{ await api(`/api/departments/${id}`,{method:"DELETE"}); await loadDepartments(); msg("departmentMsg","Department deleted.","ok"); }catch(e){ msg("departmentMsg",e.message,"bad"); } }
+    async function loadAccounts(){ const rows=await api("/api/accounts"); accountRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.username)}</td><td>${esc(r.display_name)}</td><td>${esc(r.division)}</td><td>${esc(r.department)}</td><td>${esc(roleLabels[r.role]||r.role)}</td><td class="${r.is_active?'':'inactive'}">${r.is_active?'Active':'Inactive'}</td><td><button class="danger" onclick="deleteAccount(${r.id})">Delete</button></td></tr>`).join(""); }
+    async function createAccount(){ try{ if(!accountUsername.value.trim()) throw new Error("Enter username."); if(accountPassword.value.length<8) throw new Error("Password must be 8+ characters."); if(!accountName.value.trim()) throw new Error("Enter display name."); await api("/api/accounts",{method:"POST",body:JSON.stringify({username:accountUsername.value.trim(),password:accountPassword.value,display_name:accountName.value.trim(),division:accountDivision.value,department:accountDept.value,role:accountRole.value,is_active:accountRole.value!=="inactive"})}); await loadAccounts(); msg("accountMsg","Account saved.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
+    async function deleteAccount(id){ try{ await api(`/api/accounts/${id}`,{method:"DELETE"}); await loadAccounts(); msg("accountMsg","Account deleted.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
+    async function loadEmails(){ const rows=await api("/api/email-recipients"); emailRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteEmail(${r.id})">Delete</button></td></tr>`).join(""); }
+    async function createEmail(){ try{ if(!emailAddress.value.trim()) throw new Error("Enter email."); await api("/api/email-recipients",{method:"POST",body:JSON.stringify({email:emailAddress.value.trim(),name:emailName.value.trim()})}); emailAddress.value=""; emailName.value=""; await loadEmails(); msg("emailMsg","Email saved.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function deleteEmail(id){ try{ await api(`/api/email-recipients/${id}`,{method:"DELETE"}); await loadEmails(); msg("emailMsg","Email deleted.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    if(state.token) enterApp().catch(()=>logout());
+  </script>
+</body>
+</html>
+

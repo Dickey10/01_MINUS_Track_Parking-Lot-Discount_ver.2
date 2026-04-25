@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    container_name: ats-parking-app
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
