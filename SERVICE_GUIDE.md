@@ -31,7 +31,65 @@ Remove the startup task:
 .\scripts\uninstall_startup_task.ps1
 ```
 
-## Option B: Docker
+## Option B: Local PC + Cloudflare Tunnel
+
+Use this when other employees need to access the app through a web URL while the
+app still runs on this PC.
+
+1. Install or place `cloudflared.exe` at:
+
+```text
+C:\Users\HOME\Downloads\cloudflared\cloudflared.exe
+```
+
+2. In Cloudflare Zero Trust, create a tunnel and route a hostname to:
+
+```text
+http://127.0.0.1:8000
+```
+
+3. Copy the tunnel token into `.env`:
+
+```text
+CLOUDFLARE_TUNNEL_TOKEN=your-cloudflare-token
+```
+
+4. Install both startup tasks:
+
+```powershell
+.\scripts\install_all_startup_tasks.ps1
+```
+
+If Windows blocks Task Scheduler registration, use the current-user Startup
+folder instead:
+
+```powershell
+.\scripts\install_user_startup_shortcuts.ps1
+```
+
+After the next Windows login, both the app server and the tunnel start
+automatically.
+
+Logs:
+
+```text
+data/server.log
+data/cloudflared.log
+```
+
+Remove the Startup folder shortcuts:
+
+```powershell
+.\scripts\uninstall_user_startup_shortcuts.ps1
+```
+
+For a temporary test URL without a token:
+
+```powershell
+.\scripts\start_cloudflare_tunnel.ps1
+```
+
+## Option C: Docker
 
 Use this when Docker Desktop is available and set to start with Windows.
 
@@ -46,4 +104,3 @@ The compose file uses `restart: unless-stopped`, so Docker restarts the app auto
 - The PC must be on.
 - The ATS app must be able to reach the ATS website from this PC.
 - If other employees need access from their PCs, expose this app through a company-approved tunnel, VPN, reverse proxy, or internal network address.
-

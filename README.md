@@ -44,6 +44,7 @@ See `SERVICE_GUIDE.md`.
 Quick options:
 
 - Windows startup task: `.\scripts\install_startup_task.ps1`
+- Local PC + Cloudflare Tunnel: `.\scripts\install_all_startup_tasks.ps1`
 - Docker: `.\scripts\run_docker.ps1`
 
 ## ATS Maintenance
