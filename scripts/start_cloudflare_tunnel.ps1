@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $ProjectRoot "data"
 $LogPath = Join-Path $LogDir "cloudflared.log"
+$OutLogPath = Join-Path $LogDir "cloudflared.out.log"
+$ErrLogPath = Join-Path $LogDir "cloudflared.err.log"
 $EnvPath = Join-Path $ProjectRoot ".env"
 $DefaultCloudflared = "C:\Users\HOME\Downloads\cloudflared\cloudflared.exe"
 
@@ -35,14 +37,13 @@ if (-not $Token) {
 
 Set-Location $ProjectRoot
 
-$ErrorActionPreference = "Continue"
 if ($Token) {
-    "Starting named Cloudflare Tunnel at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append
-    $Command = "`"$Cloudflared`" tunnel run --token $Token >> `"$LogPath`" 2>&1"
-    & cmd.exe /c $Command
+    "Starting named Cloudflare Tunnel at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append -Encoding utf8
+    $Args = @("tunnel", "run", "--token", $Token)
 } else {
-    "Starting temporary Cloudflare Tunnel at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append
-    "No CLOUDFLARE_TUNNEL_TOKEN found. This URL changes each time." | Out-File -FilePath $LogPath -Append
-    $Command = "`"$Cloudflared`" tunnel --url http://127.0.0.1:8000 >> `"$LogPath`" 2>&1"
-    & cmd.exe /c $Command
+    "Starting temporary Cloudflare Tunnel at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append -Encoding utf8
+    "No CLOUDFLARE_TUNNEL_TOKEN found. This URL changes each time." | Out-File -FilePath $LogPath -Append -Encoding utf8
+    $Args = @("tunnel", "--url", "http://127.0.0.1:8000")
 }
+
+Start-Process -FilePath $Cloudflared -ArgumentList $Args -WorkingDirectory $ProjectRoot -WindowStyle Hidden -RedirectStandardOutput $OutLogPath -RedirectStandardError $ErrLogPath

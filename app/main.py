@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from app.ats.registrar import ATSRegistrar
 from app.config import settings
@@ -119,7 +119,7 @@ async def root():
 
 @app.get("/favicon.ico")
 async def favicon():
-    return JSONResponse(status_code=204, content=None)
+    return Response(status_code=204)
 
 
 @app.get("/health")
