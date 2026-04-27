@@ -34,4 +34,5 @@ $Port = Get-EnvValue "APP_PORT" "8000"
 "Starting ATS Parking server at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append
 "Binding to http://$HostAddress`:$Port" | Out-File -FilePath $LogPath -Append
 $ErrorActionPreference = "Continue"
-& $Python -m uvicorn app.main:app --host $HostAddress --port $Port >> $LogPath 2>&1
+$Command = "`"$Python`" -m uvicorn app.main:app --host $HostAddress --port $Port >> `"$LogPath`" 2>&1"
+& cmd.exe /c $Command
