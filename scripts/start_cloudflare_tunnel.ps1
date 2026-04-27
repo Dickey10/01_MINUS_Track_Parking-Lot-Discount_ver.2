@@ -35,11 +35,12 @@ if (-not $Token) {
 
 Set-Location $ProjectRoot
 
+$ErrorActionPreference = "Continue"
 if ($Token) {
     "Starting named Cloudflare Tunnel at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append
-    & $Cloudflared tunnel run --token $Token *>> $LogPath
+    & $Cloudflared tunnel run --token $Token >> $LogPath 2>&1
 } else {
     "Starting temporary Cloudflare Tunnel at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append
     "No CLOUDFLARE_TUNNEL_TOKEN found. This URL changes each time." | Out-File -FilePath $LogPath -Append
-    & $Cloudflared tunnel --url http://127.0.0.1:8000 *>> $LogPath
+    & $Cloudflared tunnel --url http://127.0.0.1:8000 >> $LogPath 2>&1
 }

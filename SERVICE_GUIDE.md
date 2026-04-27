@@ -89,6 +89,44 @@ For a temporary test URL without a token:
 .\scripts\start_cloudflare_tunnel.ps1
 ```
 
+The temporary URL looks like:
+
+```text
+https://random-words.trycloudflare.com
+```
+
+It does not require domain ownership, but the URL changes whenever the tunnel
+restarts. This is useful for demos, not production.
+
+## Option B-2: Same Wi-Fi or Office LAN by IP Address
+
+This works only when users are on the same office network or VPN.
+
+1. Change `.env`:
+
+```text
+APP_HOST=0.0.0.0
+APP_PORT=8000
+```
+
+2. Restart the app.
+
+3. Find this PC's IPv4 address:
+
+```powershell
+ipconfig
+```
+
+4. Other users open:
+
+```text
+http://YOUR_PC_IPV4:8000
+```
+
+If it does not open, Windows Firewall must allow inbound TCP port `8000`.
+Do not expose this directly to the public Internet without a VPN, tunnel, or
+reverse proxy.
+
 ## Option C: Docker
 
 Use this when Docker Desktop is available and set to start with Windows.
