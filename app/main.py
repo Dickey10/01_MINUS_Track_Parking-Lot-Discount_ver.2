@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 
 from app.ats.registrar import ATSRegistrar
 from app.config import settings
@@ -124,6 +124,11 @@ async def favicon():
 
 @app.get("/health")
 async def health():
+    return RedirectResponse(url="/")
+
+
+@app.get("/api/health")
+async def api_health():
     return {"status": "ok"}
 
 
