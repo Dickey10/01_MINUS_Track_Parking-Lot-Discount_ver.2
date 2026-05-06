@@ -26,6 +26,16 @@ Logs:
 data/server.log
 ```
 
+If ATS automatic registration shows a Playwright browser error such as
+`Executable doesn't exist`, run:
+
+```powershell
+.\scripts\setup_runtime.ps1
+```
+
+That command installs both Python packages and the Chromium browser used for ATS
+automation.
+
 Remove the startup task:
 
 ```powershell

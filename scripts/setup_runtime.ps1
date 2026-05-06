@@ -14,4 +14,5 @@ if (-not (Test-Path $VenvPython)) {
 }
 
 & $VenvPython -m pip install -r requirements.txt
+& $VenvPython -m playwright install chromium
 Write-Host "Runtime ready: $VenvPython"
