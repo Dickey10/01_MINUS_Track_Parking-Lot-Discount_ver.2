@@ -9,10 +9,53 @@ from app.ats.session import is_session_valid, save_session, session_exists
 from app.config import settings
 from app.integrations.gsheets import append_history
 from app.integrations.mailer import send_failure_alert
-from app.models import RegisterRequest, RegisterResponse
+from app.models import ATSDiscountDeleteRequest, ATSDiscountDeleteResponse, RegisterRequest, RegisterResponse
 
 
 class ATSRegistrar:
+    async def delete_discount(self, req: ATSDiscountDeleteRequest) -> ATSDiscountDeleteResponse:
+        if not settings.ats_id or not settings.ats_pw:
+            return ATSDiscountDeleteResponse(
+                success=False,
+                message="ATS credentials are not configured.",
+                tckttrns_id=req.tckttrns_id,
+                idno=req.idno,
+            )
+
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            ctx_kwargs = {}
+            if session_exists():
+                ctx_kwargs["storage_state"] = str(Path(settings.session_path))
+
+            context = await browser.new_context(ignore_https_errors=True, **ctx_kwargs)
+            page = await context.new_page()
+
+            try:
+                if not await is_session_valid(page, settings.ats_url):
+                    await self._login(page, context)
+                await page.goto(f"{settings.ats_url}{sel.DISCOUNT_URL}")
+                await page.wait_for_load_state("networkidle")
+                data = await self._delete_discount(page, req.tckttrns_id, req.idno)
+                if not isinstance(data, dict) or "memberInfo" not in data:
+                    raise RuntimeError(f"ATS delete returned an unexpected response: {data}")
+                return ATSDiscountDeleteResponse(
+                    success=True,
+                    message="ATS discount history was deleted.",
+                    tckttrns_id=req.tckttrns_id,
+                    idno=req.idno,
+                )
+            except Exception as exc:
+                return ATSDiscountDeleteResponse(
+                    success=False,
+                    message=f"ATS delete error: {exc}",
+                    tckttrns_id=req.tckttrns_id,
+                    idno=req.idno,
+                )
+            finally:
+                await context.close()
+                await browser.close()
+
     async def run(self, req: RegisterRequest) -> RegisterResponse:
         if not settings.ats_id or not settings.ats_pw:
             return RegisterResponse(
@@ -208,6 +251,17 @@ class ATSRegistrar:
         data = await self._json_response(response)
         if data is not True:
             raise RuntimeError(f"ATS save failed: {data}")
+
+    async def _delete_discount(self, page: Page, tckttrns_id: str, idno: str) -> Any:
+        response = await self._post_ats_form(
+            page,
+            sel.DELETE_DISCOUNT_URL,
+            {
+                "tckttrns_id": tckttrns_id,
+                "idno": idno,
+            },
+        )
+        return await self._json_response(response)
 
     async def _post_ats_form(self, page: Page, path: str, form: dict[str, Any]) -> APIResponse:
         response = await page.request.post(

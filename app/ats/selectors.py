@@ -5,6 +5,7 @@ DISCOUNT_URL = "/discount/registration"
 LIST_FOR_DISCOUNT_URL = "/discount/registration/listForDiscount"
 GET_FOR_DISCOUNT_URL = "/discount/registration/getForDiscount"
 SAVE_DISCOUNT_URL = "/discount/registration/save"
+DELETE_DISCOUNT_URL = "/state/delete"
 
 DEFAULT_LOT_AREA = "8"
 

@@ -81,3 +81,15 @@ class RegisterResponse(BaseModel):
     coupon_30_count: int = 0
     coupon_60_count: int = 0
     screenshot_path: str = ""
+
+
+class ATSDiscountDeleteRequest(BaseModel):
+    tckttrns_id: str = Field(min_length=1, max_length=50)
+    idno: str = Field(min_length=1, max_length=50)
+
+
+class ATSDiscountDeleteResponse(BaseModel):
+    success: bool
+    message: str
+    tckttrns_id: str
+    idno: str

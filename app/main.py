@@ -13,6 +13,7 @@ from app.integrations.mailer import send_result_email
 from app.models import (
     AccountCreate,
     AccountUpdate,
+    ATSDiscountDeleteRequest,
     DepartmentCreate,
     DivisionCreate,
     EmailRecipientCreate,
@@ -570,6 +571,16 @@ async def stats(
         "coupon_60_count": sum(row["coupon_60_count"] for row in applications),
         "items": applications,
     }
+
+
+@app.post("/api/ats/discount-delete")
+async def delete_ats_discount(req: ATSDiscountDeleteRequest, user: dict = Depends(require_admin)):
+    async with _ats_lock:
+        result = await registrar.delete_discount(req)
+    audit(user["id"], "delete", "ats_discount", None, f"{req.tckttrns_id}/{req.idno}")
+    if not result.success:
+        raise HTTPException(status_code=502, detail=result.message)
+    return result
 
 
 @app.post("/register", response_model=RegisterResponse)
