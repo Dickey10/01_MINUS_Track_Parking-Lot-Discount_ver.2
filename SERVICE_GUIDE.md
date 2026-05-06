@@ -10,6 +10,7 @@ Run PowerShell once:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+.\scripts\setup_runtime.ps1
 .\scripts\install_startup_task.ps1
 ```
 
@@ -57,6 +58,7 @@ CLOUDFLARE_TUNNEL_TOKEN=your-cloudflare-token
 4. Install both startup tasks:
 
 ```powershell
+.\scripts\setup_runtime.ps1
 .\scripts\install_all_startup_tasks.ps1
 ```
 
@@ -75,6 +77,13 @@ Logs:
 ```text
 data/server.log
 data/cloudflared.log
+data/cloudflared.err.log
+```
+
+Show the current local and temporary Cloudflare demo URLs:
+
+```powershell
+.\scripts\show_demo_urls.ps1
 ```
 
 Remove the Startup folder shortcuts:

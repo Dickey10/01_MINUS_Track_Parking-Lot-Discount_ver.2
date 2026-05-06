@@ -1,7 +1,9 @@
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$Python = "C:\Users\HOME\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
+$ProjectPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+$FallbackPython = "C:\Users\HOME\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
+$Python = if (Test-Path $ProjectPython) { $ProjectPython } else { $FallbackPython }
 $LogDir = Join-Path $ProjectRoot "data"
 $LogPath = Join-Path $LogDir "server.log"
 $OutLogPath = Join-Path $LogDir "server.out.log"
