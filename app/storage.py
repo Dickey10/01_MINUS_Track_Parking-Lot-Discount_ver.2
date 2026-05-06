@@ -119,6 +119,7 @@ def init_db() -> None:
         )
         _migrate_accounts(conn)
         _ensure_column(conn, "parking_applications", "division", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(conn, "parking_applications", "ats_entry_id", "TEXT NOT NULL DEFAULT ''")
         admin = conn.execute(
             "SELECT id FROM accounts WHERE username = ?", (settings.admin_username,)
         ).fetchone()

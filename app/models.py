@@ -50,6 +50,7 @@ class EmailRecipientCreate(BaseModel):
 class ParkingApplicationCreate(BaseModel):
     car_number: str = Field(min_length=2, max_length=30)
     entry_time: datetime | None = None
+    ats_entry_id: str = ""
     dept: str = Field(min_length=1, max_length=80)
     requester: str = Field(min_length=1, max_length=80)
     visitor_company: str = ""
@@ -64,6 +65,7 @@ class ManualApplyRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     car_number: str
+    ats_entry_id: str = ""
     discount_type: Literal["30", "60"] = "30"
     coupon_30_count: int = Field(default=0, ge=0, le=48)
     coupon_60_count: int = Field(default=0, ge=0, le=24)

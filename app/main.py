@@ -388,14 +388,15 @@ async def create_application(req: ParkingApplicationCreate, user: dict = Depends
         cur = conn.execute(
             """
             INSERT INTO parking_applications
-              (car_number, entry_time, division, dept, requester, visitor_company, visit_purpose,
+              (car_number, entry_time, ats_entry_id, division, dept, requester, visitor_company, visit_purpose,
                elapsed_minutes, effective_minutes, coupon_30_count, coupon_60_count,
                total_discount_minutes, status, created_by, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
             """,
             (
                 req.car_number,
                 entry_time.isoformat(timespec="seconds"),
+                req.ats_entry_id.strip(),
                 user.get("division", ""),
                 req.dept,
                 req.requester,
@@ -430,6 +431,7 @@ async def process_application(application_id: int, user: dict = Depends(get_curr
 
     req = RegisterRequest(
         car_number=application["car_number"],
+        ats_entry_id=application.get("ats_entry_id", ""),
         discount_type="60" if application["coupon_60_count"] else "30",
         coupon_30_count=application["coupon_30_count"],
         coupon_60_count=application["coupon_60_count"],
@@ -571,6 +573,17 @@ async def stats(
         "coupon_60_count": sum(row["coupon_60_count"] for row in applications),
         "items": applications,
     }
+
+
+@app.get("/api/ats/entries")
+async def search_ats_entries(
+    car_number: str = Query(min_length=2, max_length=30),
+    entry_date: str = Query(default=""),
+    _: dict = Depends(get_current_user),
+):
+    async with _ats_lock:
+        rows = await registrar.search_entries(car_number, entry_date)
+    return {"items": rows}
 
 
 @app.post("/api/ats/discount-delete")

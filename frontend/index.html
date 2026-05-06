@@ -43,6 +43,9 @@
     .filter-row select { min-width:110px; margin:0; padding:7px; }
     .col-toggle { display:flex; align-items:center; gap:5px; white-space:nowrap; }
     .col-toggle input { width:auto; margin:0; }
+    .entry-box { margin-top:12px; }
+    .entry-box table { min-width:760px; }
+    .entry-box tr.selected td { background:#e8f1ff; font-weight:700; }
     .succeeded { color:var(--green); font-weight:700; }
     .pending { color:var(--amber); font-weight:700; }
     .failed, .inactive { color:var(--red); font-weight:700; }
@@ -85,7 +88,11 @@
             <label>Visit Purpose<input id="visitPurpose" placeholder="Meeting"></label>
             <label>Mode<select id="autoApply"><option value="true">Apply to ATS</option><option value="false">Save only</option></select></label>
           </div>
-          <div class="actions"><button onclick="createApplication()">Submit</button><button class="ghost" onclick="previewDiscount()">Preview Coupons</button></div>
+          <div class="actions"><button class="ghost" onclick="searchEntries()">Check Entry</button><button onclick="createApplication()">Submit</button><button class="ghost" onclick="previewDiscount()">Preview Coupons</button></div>
+          <div id="entryBox" class="entry-box hidden">
+            <h3>ATS Current Entries</h3>
+            <div class="excel-wrap"><table class="excel"><thead><tr><th>Select</th><th>Entry ID</th><th>Car</th><th>Entry Time</th><th>Parking Time</th><th>Search Date</th></tr></thead><tbody id="entryRows"></tbody></table></div>
+          </div>
           <div id="applyMsg" class="message"></div>
         </section>
 
@@ -152,7 +159,7 @@
     </div>
   </main>
   <script>
-    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [] };
+    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [], selectedEntry: null };
     const roleLabels = { super_admin:"Super Admin", admin:"Super Admin", division_admin:"Division Admin", user:"User", manager:"User", inactive:"Inactive" };
     const statusLabels = { pending:"Pending", succeeded:"Completed" };
     const columns = [["id","ID"],["status","Status"],["car_number","Car"],["division","Division"],["dept","Department"],["requester","Requester"],["visitor_company","Company"],["visit_purpose","Purpose"],["entry_time","Entry Time"],["effective_minutes","Total Minutes"],["coupon_60_count","60m"],["coupon_30_count","30m"],["email_status","Email"],["failure_reason","Failure"]];
@@ -166,9 +173,15 @@
     async function enterApp(){ if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!["super_admin","admin"].includes(state.user.role))); setDefaultEntryTime(); await Promise.all([loadDivisions(),loadDepartments(),loadStats()]); if(["super_admin","admin"].includes(state.user.role)) await Promise.all([loadAccounts(),loadEmails()]); }
     function showTab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name)); document.querySelectorAll("section").forEach(s=>s.classList.toggle("active",s.id===`tab-${name}`)); }
     function setDefaultEntryTime(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); entryTime.value=d.toISOString().slice(0,16); }
-    function buildApplicationPayload(){ return { car_number:carNumber.value.trim(), entry_time:entryTime.value?new Date(entryTime.value).toISOString():null, dept:dept.value, requester:requester.value.trim(), visitor_company:visitorCompany.value.trim(), visit_purpose:visitPurpose.value.trim(), auto_apply:autoApply.value==="true" }; }
+    function entryDateForAts(){ return entryTime.value ? entryTime.value.slice(0,10).replaceAll("-","") : ""; }
+    function atsEntryTime(row){ return row.entryDateToString || row.dtInDateStr || row.dtInDate || row.entry_date || ""; }
+    function parseAtsEntryTime(value){ const raw=String(value||"").replace(/\D/g,""); if(raw.length<12) return ""; return `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(8,10)}:${raw.slice(10,12)}`; }
+    function clearSelectedEntry(){ state.selectedEntry=null; entryBox.classList.add("hidden"); entryRows.innerHTML=""; }
+    function buildApplicationPayload(){ return { car_number:carNumber.value.trim(), entry_time:entryTime.value?new Date(entryTime.value).toISOString():null, ats_entry_id:state.selectedEntry ? String(state.selectedEntry.id || state.selectedEntry.iID || "") : "", dept:dept.value, requester:requester.value.trim(), visitor_company:visitorCompany.value.trim(), visit_purpose:visitPurpose.value.trim(), auto_apply:autoApply.value==="true" }; }
+    async function searchEntries(){ try{ if(!carNumber.value.trim()) throw new Error("Enter car number."); msg("applyMsg","Checking ATS current entries...","note"); const params=new URLSearchParams({car_number:carNumber.value.trim(),entry_date:entryDateForAts()}); const data=await api(`/api/ats/entries?${params}`); entryBox.classList.remove("hidden"); state.selectedEntry=null; entryRows.innerHTML=(data.items||[]).map((row,idx)=>`<tr id="entryRow${idx}"><td><button class="ghost" onclick="selectEntry(${idx})">Select</button></td><td>${esc(row.id||row.iID||"")}</td><td>${esc(row.carNo||row.acPlate1||"")}</td><td>${esc(atsEntryTime(row))}</td><td>${esc(row.differentTime||row.different_time||"")}</td><td>${esc(row.searchDate||"")}</td></tr>`).join(""); state.entryItems=data.items||[]; if(!state.entryItems.length) return msg("applyMsg","ATS에서 현재 입차 내역을 찾지 못했습니다. ATS 화면의 입차일과 차량번호를 다시 확인하세요.","bad"); msg("applyMsg",`ATS 입차 내역 ${state.entryItems.length}건을 찾았습니다. 적용할 행을 선택한 뒤 Submit을 누르세요.`,"ok"); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    function selectEntry(index){ state.selectedEntry=state.entryItems[index]; document.querySelectorAll("#entryRows tr").forEach((tr,i)=>tr.classList.toggle("selected",i===index)); const time=parseAtsEntryTime(atsEntryTime(state.selectedEntry)); if(time) entryTime.value=time; const selectedCar=state.selectedEntry.carNo||state.selectedEntry.acPlate1; if(selectedCar) carNumber.value=selectedCar; msg("applyMsg",`선택됨: 입차ID ${state.selectedEntry.id||state.selectedEntry.iID}, 차량 ${selectedCar||carNumber.value}`,"ok"); }
     function previewDiscount(){ if(!entryTime.value) return msg("applyMsg","Enter entry time.","bad"); const elapsed=Math.max(0,Math.ceil((Date.now()-new Date(entryTime.value).getTime())/60000)); const effective=elapsed+10, units=Math.max(1,Math.floor((effective+10)/30)+1), c60=Math.floor(units/2), c30=units%2; msg("applyMsg",`Elapsed ${elapsed}m + exit buffer 10m = ${effective}m\n60m coupons: ${c60}, 30m coupons: ${c30}`,"note"); }
-    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("Enter car number."); if(!requester.value.trim()) throw new Error("Enter requester."); if(!visitPurpose.value.trim()) throw new Error("Enter visit purpose."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`Saved #${app.id}\nStatus: ${statusLabels[app.status]||app.status}\n60m: ${app.coupon_60_count}, 30m: ${app.coupon_30_count}${app.failure_reason ? "\nReason: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("Enter car number."); if(!requester.value.trim()) throw new Error("Enter requester."); if(!visitPurpose.value.trim()) throw new Error("Enter visit purpose."); if(autoApply.value==="true" && !state.selectedEntry) throw new Error("먼저 Check Entry로 ATS 입차 내역을 조회하고 적용할 행을 선택하세요."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`Saved #${app.id}\nStatus: ${statusLabels[app.status]||app.status}\n60m: ${app.coupon_60_count}, 30m: ${app.coupon_30_count}${app.failure_reason ? "\nReason: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
     async function loadStats(){ const params=new URLSearchParams(); document.querySelectorAll(".filter-select").forEach(sel=>{ if(sel.value) params.set(sel.dataset.key,sel.value); }); const data=await api(`/api/stats?${params}`); state.rows=data.items; renderHistory(data); }
     function renderHistory(data){ columnToggles.innerHTML=columns.map(([k,l])=>`<th><label class="col-toggle"><input type="checkbox" checked data-col="${k}" onchange="renderHistoryFromState()"> ${l}</label></th>`).join(""); historyHead.innerHTML=columns.map(([k,l])=>`<th data-col="${k}">${l}</th>`).join(""); columnFilters.innerHTML=columns.map(([k])=>{ const filterable=["status","division","dept","requester","visitor_company","visit_purpose","email_status"].includes(k); if(!filterable) return `<th data-col="${k}"></th>`; const values=unique(state.rows.map(r=>r[k])); return `<th data-col="${k}"><select class="filter-select" data-key="${k}" onchange="loadStats()"><option value="">All</option>${values.map(v=>`<option value="${esc(v)}">${esc(statusLabels[v]||v)}</option>`).join("")}</select></th>`; }).join(""); renderHistoryFromState(data); }
     function renderHistoryFromState(data=null){ const visible=new Set([...document.querySelectorAll("#columnToggles input")].filter(i=>i.checked).map(i=>i.dataset.col)); historyRows.innerHTML=state.rows.map(row=>`<tr>${columns.map(([k])=>`<td data-col="${k}" class="${esc(row[k])}">${esc(statusLabels[row[k]]||row[k])}</td>`).join("")}</tr>`).join(""); const summary=data||{count:state.rows.length,subtotal_effective_minutes:state.rows.reduce((s,r)=>s+r.effective_minutes,0),coupon_60_count:state.rows.reduce((s,r)=>s+r.coupon_60_count,0),coupon_30_count:state.rows.reduce((s,r)=>s+r.coupon_30_count,0)}; historyTotals.innerHTML=columns.map(([k])=>{ let v=""; if(k==="id") v=`Count ${summary.count}`; if(k==="effective_minutes") v=`Subtotal ${summary.subtotal_effective_minutes}m`; if(k==="coupon_60_count") v=`${summary.coupon_60_count}`; if(k==="coupon_30_count") v=`${summary.coupon_30_count}`; return `<td data-col="${k}">${v}</td>`; }).join(""); document.querySelectorAll("[data-col]").forEach(el=>el.classList.toggle("hidden",!visible.has(el.dataset.col))); }
@@ -186,8 +199,9 @@
     async function loadEmails(){ const rows=await api("/api/email-recipients"); emailRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteEmail(${r.id})">Delete</button></td></tr>`).join(""); }
     async function createEmail(){ try{ if(!emailAddress.value.trim()) throw new Error("Enter email."); await api("/api/email-recipients",{method:"POST",body:JSON.stringify({email:emailAddress.value.trim(),name:emailName.value.trim()})}); emailAddress.value=""; emailName.value=""; await loadEmails(); msg("emailMsg","Email saved.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     async function deleteEmail(id){ try{ await api(`/api/email-recipients/${id}`,{method:"DELETE"}); await loadEmails(); msg("emailMsg","Email deleted.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    carNumber.addEventListener("input", clearSelectedEntry);
+    entryTime.addEventListener("change", clearSelectedEntry);
     if(state.token) enterApp().catch(()=>logout());
   </script>
 </body>
 </html>
-

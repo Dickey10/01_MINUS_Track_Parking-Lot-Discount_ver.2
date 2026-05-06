@@ -13,6 +13,29 @@ from app.models import ATSDiscountDeleteRequest, ATSDiscountDeleteResponse, Regi
 
 
 class ATSRegistrar:
+    async def search_entries(self, car_number: str, entry_date: str = "") -> list[dict[str, Any]]:
+        if not settings.ats_id or not settings.ats_pw:
+            raise RuntimeError("ATS credentials are not configured.")
+
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            ctx_kwargs = {}
+            if session_exists():
+                ctx_kwargs["storage_state"] = str(Path(settings.session_path))
+
+            context = await browser.new_context(ignore_https_errors=True, **ctx_kwargs)
+            page = await context.new_page()
+
+            try:
+                if not await is_session_valid(page, settings.ats_url):
+                    await self._login(page, context)
+                await page.goto(f"{settings.ats_url}{sel.DISCOUNT_URL}")
+                await page.wait_for_load_state("networkidle")
+                return await self._search_entries(page, car_number, entry_date)
+            finally:
+                await context.close()
+                await browser.close()
+
     async def delete_discount(self, req: ATSDiscountDeleteRequest) -> ATSDiscountDeleteResponse:
         if not settings.ats_id or not settings.ats_pw:
             return ATSDiscountDeleteResponse(
@@ -124,7 +147,7 @@ class ATSRegistrar:
         await page.goto(f"{settings.ats_url}{sel.DISCOUNT_URL}")
         await page.wait_for_load_state("networkidle")
 
-        entry = await self._find_entry(page, req.car_number)
+        entry = {"id": req.ats_entry_id} if req.ats_entry_id else await self._find_entry(page, req.car_number)
         if not entry:
             return RegisterResponse(
                 success=False,
@@ -184,20 +207,71 @@ class ATSRegistrar:
 
     async def _find_entry(self, page: Page, car_number: str) -> dict[str, Any] | None:
         normalized = self._normalize_car_number(car_number)
-        candidate_dates = [
-            datetime.now().strftime("%Y%m%d"),
-            (datetime.now() - timedelta(days=1)).strftime("%Y%m%d"),
-        ]
-
-        for entry_date in candidate_dates:
-            rows = await self._list_for_discount(page, car_number, entry_date)
-            for row in rows:
-                row_car = self._normalize_car_number(str(row.get("carNo") or row.get("acPlate1") or ""))
-                if normalized and normalized in row_car:
-                    return row
-            if rows:
-                return rows[0]
+        rows = await self._search_entries(page, car_number)
+        for row in rows:
+            row_car = self._normalize_car_number(str(row.get("carNo") or row.get("acPlate1") or ""))
+            if normalized and normalized in row_car:
+                return row
+        if rows:
+            return rows[0]
         return None
+
+    async def _search_entries(self, page: Page, car_number: str, entry_date: str = "") -> list[dict[str, Any]]:
+        dates = self._candidate_entry_dates(entry_date)
+        terms = self._car_search_terms(car_number)
+        seen: set[str] = set()
+        entries: list[dict[str, Any]] = []
+
+        for candidate in dates:
+            for term in terms:
+                rows = await self._list_for_discount(page, term, candidate)
+                for row in rows:
+                    row_id = str(row.get("id") or row.get("iID") or "")
+                    key = row_id or f"{row.get('carNo')}-{row.get('entryDateToString')}-{candidate}"
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    row["searchDate"] = candidate
+                    row["searchTerm"] = term
+                    entries.append(row)
+        return entries
+
+    def _car_search_terms(self, car_number: str) -> list[str]:
+        normalized = self._normalize_car_number(car_number)
+        digits = "".join(ch for ch in normalized if ch.isdigit())
+        candidates = [normalized]
+        if len(digits) >= 4:
+            candidates.append(digits[-4:])
+        if len(digits) > 4:
+            candidates.append(digits[:-4])
+
+        result: list[str] = []
+        for value in candidates:
+            if value and value not in result:
+                result.append(value)
+        return result
+
+    def _candidate_entry_dates(self, entry_date: str = "") -> list[str]:
+        raw = "".join(ch for ch in (entry_date or "") if ch.isdigit())
+        parsed: datetime | None = None
+        if len(raw) >= 8:
+            try:
+                parsed = datetime.strptime(raw[:8], "%Y%m%d")
+            except ValueError:
+                parsed = None
+
+        base_dates = []
+        if parsed:
+            base_dates.extend([parsed, parsed - timedelta(days=1), parsed + timedelta(days=1)])
+        now = datetime.now()
+        base_dates.extend([now, now - timedelta(days=1), now + timedelta(days=1)])
+
+        result: list[str] = []
+        for value in base_dates:
+            formatted = value.strftime("%Y%m%d")
+            if formatted not in result:
+                result.append(formatted)
+        return result
 
     async def _list_for_discount(self, page: Page, car_number: str, entry_date: str) -> list[dict[str, Any]]:
         response = await self._post_ats_form(
