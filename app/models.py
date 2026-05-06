@@ -47,6 +47,14 @@ class EmailRecipientCreate(BaseModel):
     is_active: bool = True
 
 
+class EmailSettingsUpdate(BaseModel):
+    smtp_host: str = Field(default="smtp.gmail.com", min_length=1, max_length=200)
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_user: str = Field(default="", max_length=200)
+    smtp_password: str = Field(default="", max_length=200)
+    alert_email: str = Field(default="", max_length=500)
+
+
 class ParkingApplicationCreate(BaseModel):
     car_number: str = Field(min_length=2, max_length=30)
     entry_time: datetime | None = None

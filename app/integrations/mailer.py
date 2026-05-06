@@ -7,8 +7,12 @@ from app.config import settings
 
 
 def _send_message(subject: str, body: str, recipients: list[str]) -> bool:
-    if not settings.smtp_user or not settings.smtp_password or not recipients:
-        return False
+    if not recipients:
+        raise RuntimeError("No active result email recipients are configured.")
+    if not settings.smtp_user:
+        raise RuntimeError("SMTP_USER is not configured.")
+    if not settings.smtp_password:
+        raise RuntimeError("SMTP_PASSWORD is not configured.")
 
     msg = MIMEMultipart()
     msg["Subject"] = subject
@@ -70,4 +74,3 @@ async def send_failure_alert(req, error_msg: str, screenshot_path: str) -> None:
         _send_message(f"[Parking Discount Failed] {req.car_number}", body, recipients)
     except Exception as exc:
         print(f"[mailer] failure alert failed: {exc}")
-

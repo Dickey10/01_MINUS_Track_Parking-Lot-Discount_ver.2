@@ -150,6 +150,20 @@
 
         <section id="tab-emails" class="admin-only">
           <h2>Result Email Recipients</h2>
+          <h3>Sender SMTP Settings</h3>
+          <p class="note message show">For Gmail or Google Workspace, use an app password instead of the normal login password.</p>
+          <div class="form-grid three">
+            <label>SMTP Host<input id="smtpHost" value="smtp.gmail.com"></label>
+            <label>SMTP Port<input id="smtpPort" type="number" value="587"></label>
+            <label>Sender Email<input id="smtpUser" type="email" placeholder="sender@example.com"></label>
+            <label>App Password<input id="smtpPassword" type="password" placeholder="Leave blank to keep current password"></label>
+            <label>Failure Alert Email<input id="alertEmail" type="email" placeholder="Optional"></label>
+          </div>
+          <div class="actions"><button onclick="saveEmailSettings()">Save SMTP Settings</button></div>
+          <h3>Resend Result Email</h3>
+          <div class="form-grid"><label>Application ID<input id="resendApplicationId" type="number" placeholder="History ID"></label></div>
+          <div class="actions"><button class="ghost" onclick="resendResultEmail()">Resend Email</button></div>
+          <h3>Recipients</h3>
           <div class="form-grid"><label>Email<input id="emailAddress" type="email"></label><label>Name<input id="emailName" placeholder="General Affairs"></label></div>
           <div class="actions"><button onclick="createEmail()">Add Email</button></div>
           <div id="emailMsg" class="message"></div>
@@ -170,7 +184,7 @@
     function unique(values){ return [...new Set(values.filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(String))].sort(); }
     async function login(){ try{ const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:loginUsername.value.trim(),password:loginPassword.value})}); const data=await res.json(); if(!res.ok) throw new Error(data.detail||"Login failed"); state.token=data.token; state.user=data.user; localStorage.setItem("atsToken",state.token); await enterApp(); }catch(e){ msg("loginMsg",e.message,"bad"); } }
     function logout(){ localStorage.removeItem("atsToken"); location.reload(); }
-    async function enterApp(){ if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!["super_admin","admin"].includes(state.user.role))); setDefaultEntryTime(); await Promise.all([loadDivisions(),loadDepartments(),loadStats()]); if(["super_admin","admin"].includes(state.user.role)) await Promise.all([loadAccounts(),loadEmails()]); }
+    async function enterApp(){ if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!["super_admin","admin"].includes(state.user.role))); setDefaultEntryTime(); await Promise.all([loadDivisions(),loadDepartments(),loadStats()]); if(["super_admin","admin"].includes(state.user.role)) await Promise.all([loadAccounts(),loadEmails(),loadEmailSettings()]); }
     function showTab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name)); document.querySelectorAll("section").forEach(s=>s.classList.toggle("active",s.id===`tab-${name}`)); }
     function setDefaultEntryTime(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); entryTime.value=d.toISOString().slice(0,16); }
     function entryDateForAts(){ return entryTime.value ? entryTime.value.slice(0,10).replaceAll("-","") : ""; }
@@ -197,6 +211,9 @@
     async function createAccount(){ try{ if(!accountUsername.value.trim()) throw new Error("Enter username."); if(accountPassword.value.length<8) throw new Error("Password must be 8+ characters."); if(!accountName.value.trim()) throw new Error("Enter display name."); await api("/api/accounts",{method:"POST",body:JSON.stringify({username:accountUsername.value.trim(),password:accountPassword.value,display_name:accountName.value.trim(),division:accountDivision.value,department:accountDept.value,role:accountRole.value,is_active:accountRole.value!=="inactive"})}); await loadAccounts(); msg("accountMsg","Account saved.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
     async function deleteAccount(id){ try{ await api(`/api/accounts/${id}`,{method:"DELETE"}); await loadAccounts(); msg("accountMsg","Account deleted.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
     async function loadEmails(){ const rows=await api("/api/email-recipients"); emailRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteEmail(${r.id})">Delete</button></td></tr>`).join(""); }
+    async function loadEmailSettings(){ try{ const data=await api("/api/email-settings"); smtpHost.value=data.smtp_host||"smtp.gmail.com"; smtpPort.value=data.smtp_port||587; smtpUser.value=data.smtp_user||""; smtpPassword.placeholder=data.smtp_password_configured?"Configured - leave blank to keep":"Google app password"; alertEmail.value=data.alert_email||""; }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function saveEmailSettings(){ try{ if(!smtpUser.value.trim()) throw new Error("Enter sender email."); if(!smtpPassword.value && smtpPassword.placeholder.indexOf("Configured") === -1) throw new Error("Enter app password."); await api("/api/email-settings",{method:"POST",body:JSON.stringify({smtp_host:smtpHost.value.trim()||"smtp.gmail.com",smtp_port:Number(smtpPort.value||587),smtp_user:smtpUser.value.trim(),smtp_password:smtpPassword.value,alert_email:alertEmail.value.trim()})}); smtpPassword.value=""; await loadEmailSettings(); msg("emailMsg","SMTP settings saved. Failed emails can now be resent.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function resendResultEmail(){ try{ if(!resendApplicationId.value) throw new Error("Enter application ID."); const data=await api(`/api/applications/${resendApplicationId.value}/resend-email`,{method:"POST"}); msg("emailMsg",`Email sent for #${data.id}. Status: ${data.email_status}`,"ok"); await loadStats(); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     async function createEmail(){ try{ if(!emailAddress.value.trim()) throw new Error("Enter email."); await api("/api/email-recipients",{method:"POST",body:JSON.stringify({email:emailAddress.value.trim(),name:emailName.value.trim()})}); emailAddress.value=""; emailName.value=""; await loadEmails(); msg("emailMsg","Email saved.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     async function deleteEmail(id){ try{ await api(`/api/email-recipients/${id}`,{method:"DELETE"}); await loadEmails(); msg("emailMsg","Email deleted.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     carNumber.addEventListener("input", clearSelectedEntry);

@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -17,6 +18,7 @@ from app.models import (
     DepartmentCreate,
     DivisionCreate,
     EmailRecipientCreate,
+    EmailSettingsUpdate,
     LoginRequest,
     ManualApplyRequest,
     ParkingApplicationCreate,
@@ -41,6 +43,7 @@ app.add_middleware(
 
 _ats_lock = asyncio.Lock()
 registrar = ATSRegistrar()
+ENV_PATH = Path(".env")
 
 
 @app.exception_handler(Exception)
@@ -111,6 +114,24 @@ def update_email_status(application_id: int, sent: bool) -> None:
             "UPDATE parking_applications SET email_status = ?, updated_at = ? WHERE id = ?",
             ("sent" if sent else "failed", utc_now(), application_id),
         )
+
+
+def update_env_values(values: dict[str, str]) -> None:
+    lines = ENV_PATH.read_text(encoding="utf-8").splitlines() if ENV_PATH.exists() else []
+    pending = values.copy()
+    updated: list[str] = []
+    for line in lines:
+        if "=" not in line or line.lstrip().startswith("#"):
+            updated.append(line)
+            continue
+        key = line.split("=", 1)[0]
+        if key in pending:
+            updated.append(f"{key}={pending.pop(key)}")
+        else:
+            updated.append(line)
+    for key, value in pending.items():
+        updated.append(f"{key}={value}")
+    ENV_PATH.write_text("\n".join(updated) + "\n", encoding="utf-8")
 
 
 @app.get("/")
@@ -378,6 +399,40 @@ async def delete_email_recipient(recipient_id: int, user: dict = Depends(require
     return {"ok": True}
 
 
+@app.get("/api/email-settings")
+async def email_settings(_: dict = Depends(require_admin)):
+    return {
+        "smtp_host": settings.smtp_host,
+        "smtp_port": settings.smtp_port,
+        "smtp_user": settings.smtp_user,
+        "smtp_password_configured": bool(settings.smtp_password),
+        "alert_email": settings.alert_email,
+    }
+
+
+@app.post("/api/email-settings")
+async def save_email_settings(req: EmailSettingsUpdate, user: dict = Depends(require_admin)):
+    values = {
+        "SMTP_HOST": req.smtp_host.strip() or "smtp.gmail.com",
+        "SMTP_PORT": str(req.smtp_port),
+        "SMTP_USER": req.smtp_user.strip(),
+        "ALERT_EMAIL": req.alert_email.strip(),
+    }
+    if req.smtp_password:
+        values["SMTP_PASSWORD"] = req.smtp_password.strip()
+    update_env_values(values)
+
+    settings.smtp_host = values["SMTP_HOST"]
+    settings.smtp_port = int(values["SMTP_PORT"])
+    settings.smtp_user = values["SMTP_USER"]
+    settings.alert_email = values["ALERT_EMAIL"]
+    if req.smtp_password:
+        settings.smtp_password = values["SMTP_PASSWORD"]
+
+    audit(user["id"], "update", "email_settings", None, settings.smtp_user)
+    return {"ok": True, "smtp_user": settings.smtp_user, "smtp_password_configured": bool(settings.smtp_password)}
+
+
 @app.post("/api/applications")
 async def create_application(req: ParkingApplicationCreate, user: dict = Depends(get_current_user)):
     entry_time = req.entry_time or datetime.now()
@@ -467,6 +522,21 @@ async def process_application(application_id: int, user: dict = Depends(get_curr
     sent = await send_result_email(updated, active_email_recipients())
     update_email_status(application_id, sent)
     return get_application(application_id)
+
+
+@app.post("/api/applications/{application_id}/resend-email")
+async def resend_application_email(application_id: int, user: dict = Depends(require_admin)):
+    application = get_application(application_id)
+    sent = await send_result_email(application, active_email_recipients())
+    update_email_status(application_id, sent)
+    audit(user["id"], "resend_email", "application", application_id, "sent" if sent else "failed")
+    updated = get_application(application_id)
+    if not sent:
+        raise HTTPException(
+            status_code=502,
+            detail="Email send failed. Check SMTP sender settings and active recipients.",
+        )
+    return updated
 
 
 @app.post("/api/applications/{application_id}/manual-apply")

@@ -121,6 +121,28 @@ Health check:
 http://127.0.0.1:8000/api/health
 ```
 
+## Result Email Setup
+
+Result email sending requires both recipient addresses and sender SMTP settings.
+
+In the app:
+
+1. Open `Result Emails`.
+2. Enter SMTP settings.
+3. For Gmail or Google Workspace, use an app password, not the normal login password.
+4. Add one or more active recipients.
+5. To retry an old failed email, enter the History ID in `Resend Result Email`.
+
+Relevant endpoints:
+
+```text
+GET  /api/email-settings
+POST /api/email-settings
+POST /api/applications/{application_id}/resend-email
+```
+
+If `SMTP_USER` or `SMTP_PASSWORD` is empty, email status becomes `failed`.
+
 ## Safety Notes
 
 - Do not expose ATS credentials in the frontend.
