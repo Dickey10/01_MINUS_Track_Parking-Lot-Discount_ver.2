@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
-from playwright.async_api import BrowserContext, Page, async_playwright
+from playwright.async_api import APIResponse, BrowserContext, Page, async_playwright
 
 from app.ats import selectors as sel
 from app.ats.session import is_session_valid, save_session, session_exists
@@ -80,11 +81,8 @@ class ATSRegistrar:
         await page.goto(f"{settings.ats_url}{sel.DISCOUNT_URL}")
         await page.wait_for_load_state("networkidle")
 
-        await page.locator(sel.CAR_SEARCH_INPUT).fill(req.car_number)
-        await page.locator(sel.SEARCH_BUTTON).click()
-        await page.wait_for_load_state("networkidle")
-
-        if await self._has_no_result(page):
+        entry = await self._find_entry(page, req.car_number)
+        if not entry:
             return RegisterResponse(
                 success=False,
                 message=f"Vehicle is not currently entered: {req.car_number}",
@@ -94,48 +92,162 @@ class ATSRegistrar:
                 coupon_60_count=req.coupon_60_count,
             )
 
-        row_index = await page.evaluate(
-            """(carNo) => {
-                try {
-                    const normalized = carNo.replace(/\\s/g, '');
-                    for (let i = 0; i < dataSetMst.length; i++) {
-                        const row = dataSetMst[i];
-                        for (const key in row) {
-                            if (String(row[key]).replace(/\\s/g, '').includes(normalized)) {
-                                XgridMst.selectRow(i, true);
-                                return i;
-                            }
-                        }
-                    }
-                } catch(e) {}
-                return -1;
-            }""",
-            req.car_number,
-        )
-
-        if row_index == -1:
+        pe_id = str(entry.get("id") or entry.get("iID") or "")
+        if not pe_id:
             return RegisterResponse(
                 success=False,
-                message=f"Vehicle was not found in ATS grid: {req.car_number}",
+                message=f"Vehicle was found, but ATS entry id is missing: {req.car_number}",
                 car_number=req.car_number,
                 discount_type=req.discount_type,
                 coupon_30_count=req.coupon_30_count,
                 coupon_60_count=req.coupon_60_count,
             )
 
-        await self._apply_coupon(page, sel.DISCOUNT_60MIN_SEL, req.coupon_60_count)
-        await self._apply_coupon(page, sel.DISCOUNT_30MIN_SEL, req.coupon_30_count)
+        detail = await self._get_discount_detail(page, pe_id)
+        discount_ids = self._discount_type_ids(detail)
+        car_number = (
+            detail.get("parkEntry", {}).get("acPlate1")
+            or entry.get("carNo")
+            or req.car_number
+        )
+
+        for _ in range(req.coupon_60_count):
+            await self._save_discount(
+                page=page,
+                pe_id=pe_id,
+                discount_type_id=discount_ids[60],
+                car_number=car_number,
+                memo=req.reason,
+            )
+        for _ in range(req.coupon_30_count):
+            await self._save_discount(
+                page=page,
+                pe_id=pe_id,
+                discount_type_id=discount_ids[30],
+                car_number=car_number,
+                memo=req.reason,
+            )
 
         screenshot_path = await self._take_screenshot(page, f"success_{req.car_number}")
         return RegisterResponse(
             success=True,
-            message="Discount coupons were applied.",
+            message="Discount coupons were applied through ATS save API.",
             car_number=req.car_number,
             discount_type="auto",
             coupon_30_count=req.coupon_30_count,
             coupon_60_count=req.coupon_60_count,
             screenshot_path=screenshot_path,
         )
+
+    async def _find_entry(self, page: Page, car_number: str) -> dict[str, Any] | None:
+        normalized = self._normalize_car_number(car_number)
+        candidate_dates = [
+            datetime.now().strftime("%Y%m%d"),
+            (datetime.now() - timedelta(days=1)).strftime("%Y%m%d"),
+        ]
+
+        for entry_date in candidate_dates:
+            rows = await self._list_for_discount(page, car_number, entry_date)
+            for row in rows:
+                row_car = self._normalize_car_number(str(row.get("carNo") or row.get("acPlate1") or ""))
+                if normalized and normalized in row_car:
+                    return row
+            if rows:
+                return rows[0]
+        return None
+
+    async def _list_for_discount(self, page: Page, car_number: str, entry_date: str) -> list[dict[str, Any]]:
+        response = await self._post_ats_form(
+            page,
+            sel.LIST_FOR_DISCOUNT_URL,
+            {
+                "iLotArea": sel.DEFAULT_LOT_AREA,
+                "entryDate": entry_date,
+                "carNo": car_number,
+            },
+        )
+        data = await self._json_response(response)
+        if isinstance(data, list):
+            return [row for row in data if isinstance(row, dict)]
+        return []
+
+    async def _get_discount_detail(self, page: Page, pe_id: str) -> dict[str, Any]:
+        response = await self._post_ats_form(
+            page,
+            sel.GET_FOR_DISCOUNT_URL,
+            {
+                "id": pe_id,
+                "member_id": settings.ats_id,
+            },
+        )
+        data = await self._json_response(response)
+        if not isinstance(data, dict):
+            raise RuntimeError("ATS getForDiscount returned an unexpected response.")
+        return data
+
+    async def _save_discount(
+        self,
+        page: Page,
+        pe_id: str,
+        discount_type_id: str,
+        car_number: str,
+        memo: str = "",
+    ) -> None:
+        response = await self._post_ats_form(
+            page,
+            sel.SAVE_DISCOUNT_URL,
+            {
+                "peId": pe_id,
+                "discountType": discount_type_id,
+                "saveCnt": "1",
+                "carNo": car_number,
+                "acPlate2": "",
+                "memo": memo or "",
+            },
+        )
+        data = await self._json_response(response)
+        if data is not True:
+            raise RuntimeError(f"ATS save failed: {data}")
+
+    async def _post_ats_form(self, page: Page, path: str, form: dict[str, Any]) -> APIResponse:
+        response = await page.request.post(
+            f"{settings.ats_url}{path}",
+            form={key: str(value) for key, value in form.items()},
+            headers={
+                "Accept": "*/*",
+                "Ajax": "true",
+                "Amano_http_ajax": "true",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": f"{settings.ats_url}{sel.DISCOUNT_URL}?SWversion=ATS3000V2.72_20220215",
+            },
+        )
+        if not response.ok:
+            raise RuntimeError(f"ATS request failed: {path} HTTP {response.status}")
+        return response
+
+    async def _json_response(self, response: APIResponse) -> Any:
+        try:
+            return await response.json()
+        except Exception:
+            return (await response.text()).strip()
+
+    def _discount_type_ids(self, detail: dict[str, Any]) -> dict[int, str]:
+        found: dict[int, str] = {}
+        for item in detail.get("listDiscountType", []):
+            try:
+                value = int(item.get("discount_value"))
+            except Exception:
+                continue
+            if value in (30, 60):
+                found[value] = str(item.get("id"))
+
+        missing = [value for value in (30, 60) if value not in found]
+        if missing:
+            raise RuntimeError(f"ATS discount type id is missing for: {missing}")
+        return found
+
+    def _normalize_car_number(self, value: str) -> str:
+        return "".join(value.split())
 
     async def _has_no_result(self, page: Page) -> bool:
         for text in (sel.NO_RESULT_MESSAGE, "검색 결과가 없습니다", "No result"):
@@ -171,4 +283,3 @@ class ATSRegistrar:
         path = directory / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe_name}.png"
         await page.screenshot(path=str(path), full_page=True)
         return str(path)
-

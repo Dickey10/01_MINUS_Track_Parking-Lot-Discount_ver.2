@@ -2,6 +2,11 @@
 
 LOGIN_URL = "/login"
 DISCOUNT_URL = "/discount/registration"
+LIST_FOR_DISCOUNT_URL = "/discount/registration/listForDiscount"
+GET_FOR_DISCOUNT_URL = "/discount/registration/getForDiscount"
+SAVE_DISCOUNT_URL = "/discount/registration/save"
+
+DEFAULT_LOT_AREA = "8"
 
 CAR_SEARCH_INPUT = "#schCarNo"
 SEARCH_BUTTON = "input.btnS1_1"
@@ -15,4 +20,3 @@ DISCOUNT_60MIN_SEL = '#div_dscntcodes a[name="btnDscntType"][time="60"]'
 # several possible labels and does not depend on these exact strings alone.
 SUCCESS_MESSAGE = "registered"
 NO_RESULT_MESSAGE = "no result"
-
