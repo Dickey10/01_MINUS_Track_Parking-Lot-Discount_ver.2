@@ -15,3 +15,9 @@ app/ats/session/
 app/ats/screenshots/
 tools/*.exe
 cloudflared*.exe
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
