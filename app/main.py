@@ -601,7 +601,10 @@ async def save_email_settings(req: EmailSettingsUpdate, user: dict = Depends(req
 @app.post("/api/applications")
 async def create_application(req: ParkingApplicationCreate, user: dict = Depends(get_current_user)):
     entry_time = req.entry_time or datetime.now()
-    plan = calculate_discount_plan(entry_time)
+    exit_time = req.exit_time or datetime.now(entry_time.tzinfo)
+    if exit_time < entry_time:
+        raise HTTPException(status_code=400, detail="출차 시간은 입차 시간 이후여야 합니다.")
+    plan = calculate_discount_plan(entry_time, now=exit_time)
     now = utc_now()
     division = department_division(req.dept) or user.get("division", "")
     if not _has_all_scope(user) and division != user.get("division", ""):

@@ -26,9 +26,16 @@
     button { border:0; border-radius:6px; padding:10px 14px; background:var(--blue); color:white; cursor:pointer; font-weight:700; }
     button.ghost { background:#eef2f6; color:var(--ink); }
     button.danger { background:var(--red); }
+    input[readonly] { background:#f8fafc; color:#344054; }
     .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
     .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .input-action { display:flex; gap:8px; align-items:flex-end; margin-top:6px; }
+    .input-action input { margin-top:0; }
+    .input-action select { margin-top:0; }
+    .input-action button { flex:0 0 auto; white-space:nowrap; }
+    .field-note { margin-top:6px; font-size:12px; color:#667085; min-height:16px; }
+    .field-note.applied { color:var(--green); font-weight:700; }
     .message { display:none; margin:14px 0; padding:12px; border-radius:6px; border:1px solid transparent; white-space:pre-wrap; }
     .message.show { display:block; }
     .ok { color:var(--green); background:#eaf8f1; border-color:#b7e4d0; }
@@ -71,7 +78,6 @@
       <nav>
         <button data-tab="apply" class="active" onclick="showTab('apply')">주차등록</button>
         <button data-tab="history" class="stats-only" onclick="showTab('history')">결과 조회/통계</button>
-        <button data-tab="manual" onclick="showTab('manual')">수동등록</button>
         <button data-tab="password" onclick="showTab('password')">비밀번호 변경</button>
         <button data-tab="accounts" class="admin-only" onclick="showTab('accounts')">계정 관리</button>
         <button data-tab="departments" class="admin-only" onclick="showTab('departments')">본부/부서 관리</button>
@@ -81,15 +87,29 @@
         <section id="tab-apply" class="active">
           <h2>방문차량 주차 할인권 신청</h2>
           <div class="form-grid">
-            <label>차량번호<input id="carNumber" placeholder="12가3456"></label>
-            <label>입차시간<input id="entryTime" type="datetime-local"></label>
+            <label>차량번호
+              <div class="input-action"><input id="carNumber" placeholder="12가3456" required><button class="ghost" onclick="searchEntries()">입차 확인</button></div>
+              <div id="entryStatus" class="field-note">입차 확인 전</div>
+            </label>
+            <label>출차시간
+              <div class="input-action">
+                <select id="exitOption">
+                  <option value="10">10분 후</option>
+                  <option value="20">20분 후</option>
+                  <option value="direct">직접 입력</option>
+                </select>
+                <button class="ghost" onclick="applyDiscountTime()">할인권 적용</button>
+              </div>
+              <select id="directExitTime" class="hidden"></select>
+              <div id="exitDeadline" class="field-note"></div>
+            </label>
             <label>신청부서<select id="dept"></select></label>
-            <label>신청자<input id="requester" placeholder="이름"></label>
-            <label>방문업체<input id="visitorCompany" placeholder="업체명"></label>
-            <label>방문목적<input id="visitPurpose" placeholder="회의"></label>
-            <label>처리방식<select id="autoApply"><option value="true">ATS 자동 적용</option><option value="false">신청만 저장</option></select></label>
+            <label>신청자<input id="requester" placeholder="이름" required></label>
+            <label>방문업체<input id="visitorCompany" placeholder="업체명" required></label>
+            <label>방문목적<select id="visitPurpose" required><option value="">선택</option><option>회의</option><option>품평</option><option>강연</option><option>기타</option></select></label>
+            <label>할인권 총 적용 금액<input id="totalAmount" readonly value="-"></label>
           </div>
-          <div class="actions"><button class="ghost" onclick="searchEntries()">입차 확인</button><button onclick="createApplication()">등록 요청</button><button class="ghost" onclick="previewDiscount()">할인권 미리보기</button></div>
+          <div class="actions"><button onclick="createApplication()">등록 요청</button></div>
           <div id="entryBox" class="entry-box hidden">
             <h3>ATS 현재 입차 내역</h3>
             <div class="excel-wrap"><table class="excel"><thead><tr><th>선택</th><th>입차ID</th><th>차량번호</th><th>입차시간</th><th>주차시간</th><th>조회일</th></tr></thead><tbody id="entryRows"></tbody></table></div>
@@ -107,17 +127,6 @@
               <tfoot><tr id="historyTotals"></tr></tfoot>
             </table>
           </div>
-        </section>
-
-        <section id="tab-manual">
-          <h2>수동등록</h2>
-          <div class="form-grid">
-            <label>신청 ID<input id="manualId" type="number"></label>
-            <label>처리 사유<input id="manualReason" value="ATS에서 수동 적용 완료"></label>
-            <label>적용 기준 시간(분)<input id="manualMinutes" type="number" placeholder="선택 입력"></label>
-          </div>
-          <div class="actions"><button onclick="manualApply()">수동 완료 처리</button></div>
-          <div id="manualMsg" class="message"></div>
         </section>
 
         <section id="tab-password">
@@ -193,7 +202,9 @@
     </div>
   </main>
   <script>
-    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [], selectedEntry: null, logoutTimer: null };
+    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [], selectedEntry: null, entryItems: [], appliedExitTime: null, appliedPlan: null, logoutTimer: null };
+    const COUPON_30_PRICE = 1000;
+    const COUPON_60_PRICE = 2000;
     const roleLabels = { super_admin:"총 관리자", admin:"총 관리자", division_admin:"본부 관리자", user:"사용자", manager:"사용자", inactive:"비활성화" };
     const statusLabels = { pending:"등록 대기중", processing:"처리중", succeeded:"등록 완료", failed:"등록 실패", manual:"수동 완료", sent:"발송 완료", not_sent:"미발송" };
     const emailLabels = { sent:"발송 완료", failed:"발송 실패", not_sent:"미발송" };
@@ -209,22 +220,31 @@
     function startLogoutTimer(){ clearTimeout(state.logoutTimer); state.logoutTimer=setTimeout(()=>{ alert("로그인 후 10분이 경과하여 자동 로그아웃됩니다."); logout(); }, 10*60*1000); }
     async function login(){ try{ const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:loginUsername.value.trim(),password:loginPassword.value})}); const data=await res.json(); if(!res.ok) throw new Error(data.detail||"로그인에 실패했습니다."); state.token=data.token; state.user=data.user; localStorage.setItem("atsToken",state.token); localStorage.setItem("atsLoginAt",String(Date.now())); startLogoutTimer(); await enterApp(); }catch(e){ msg("loginMsg",e.message,"bad"); } }
     function logout(){ localStorage.removeItem("atsToken"); localStorage.removeItem("atsLoginAt"); location.reload(); }
-    async function enterApp(){ const loginAt=Number(localStorage.getItem("atsLoginAt")||Date.now()); if(Date.now()-loginAt>=10*60*1000) return logout(); startLogoutTimer(); if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!isAdminUser())); document.querySelectorAll(".stats-only").forEach(el=>el.classList.toggle("hidden",!canViewStats())); setDefaultEntryTime(); await loadDivisions(); await loadDepartments(); await loadPasswordTargets(); if(canViewStats()) await loadStats(); if(isAdminUser()) await Promise.all([loadAccounts(),loadEmails(),loadEmailSettings()]); }
+    async function enterApp(){ const loginAt=Number(localStorage.getItem("atsLoginAt")||Date.now()); if(Date.now()-loginAt>=10*60*1000) return logout(); startLogoutTimer(); if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!isAdminUser())); document.querySelectorAll(".stats-only").forEach(el=>el.classList.toggle("hidden",!canViewStats())); setupExitOptions(); await loadDivisions(); await loadDepartments(); await loadPasswordTargets(); if(canViewStats()) await loadStats(); if(isAdminUser()) await Promise.all([loadAccounts(),loadEmails(),loadEmailSettings()]); }
     function showTab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name)); document.querySelectorAll("section").forEach(s=>s.classList.toggle("active",s.id===`tab-${name}`)); }
-    function setDefaultEntryTime(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); entryTime.value=d.toISOString().slice(0,16); }
-    function entryDateForAts(){ return entryTime.value ? entryTime.value.slice(0,10).replaceAll("-","") : ""; }
+    function pad(n){ return String(n).padStart(2,"0"); }
+    function formatTime(date){ return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`; }
+    function floorToMinute(date){ const d=new Date(date); d.setSeconds(0,0); return d; }
+    function ceilToTenMinutes(date){ const d=floorToMinute(date); const remainder=d.getMinutes()%10; if(remainder) d.setMinutes(d.getMinutes()+(10-remainder)); return d; }
+    function buildDirectExitOptions(){ directExitTime.innerHTML=""; const now=new Date(); const start=ceilToTenMinutes(new Date(now.getTime()+20*60000)); const end=new Date(now.getTime()+12*60*60000); for(let d=new Date(start); d<=end; d.setMinutes(d.getMinutes()+10)){ directExitTime.insertAdjacentHTML("beforeend",`<option value="${d.toISOString()}">${formatTime(d)}</option>`); } }
+    function setupExitOptions(){ buildDirectExitOptions(); updateExitDeadline(); }
+    function selectedExitTime(){ if(exitOption.value==="direct") return new Date(directExitTime.value); const base=floorToMinute(new Date()); return new Date(base.getTime()+Number(exitOption.value)*60000); }
+    function resetDiscountApplication(){ state.appliedExitTime=null; state.appliedPlan=null; exitDeadline.className="field-note"; totalAmount.value="-"; }
+    function updateExitDeadline(refreshDirect=false){ if(refreshDirect && exitOption.value==="direct") buildDirectExitOptions(); directExitTime.classList.toggle("hidden",exitOption.value!=="direct"); resetDiscountApplication(); const exit=selectedExitTime(); exitDeadline.textContent=`출차 기한 ${formatTime(exit)} - 할인권 미적용`; }
+    function entryDateForAts(){ const d=new Date(); return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`; }
     function atsEntryTime(row){ return row.entryDateToString || row.dtInDateStr || row.dtInDate || row.entry_date || ""; }
     function parseAtsEntryTime(value){ const raw=String(value||"").replace(/\D/g,""); if(raw.length<12) return ""; return `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(8,10)}:${raw.slice(10,12)}`; }
-    function clearSelectedEntry(){ state.selectedEntry=null; entryBox.classList.add("hidden"); entryRows.innerHTML=""; }
-    function buildApplicationPayload(){ return { car_number:carNumber.value.trim(), entry_time:entryTime.value?new Date(entryTime.value).toISOString():null, ats_entry_id:state.selectedEntry ? String(state.selectedEntry.id || state.selectedEntry.iID || "") : "", dept:dept.value, requester:requester.value.trim(), visitor_company:visitorCompany.value.trim(), visit_purpose:visitPurpose.value.trim(), auto_apply:autoApply.value==="true" }; }
-    async function searchEntries(){ try{ if(!carNumber.value.trim()) throw new Error("차량번호를 입력하세요."); msg("applyMsg","ATS 현재 입차 내역을 확인하고 있습니다...","note"); const params=new URLSearchParams({car_number:carNumber.value.trim(),entry_date:entryDateForAts()}); const data=await api(`/api/ats/entries?${params}`); entryBox.classList.remove("hidden"); state.selectedEntry=null; entryRows.innerHTML=(data.items||[]).map((row,idx)=>`<tr id="entryRow${idx}"><td><button class="ghost" onclick="selectEntry(${idx})">선택</button></td><td>${esc(row.id||row.iID||"")}</td><td>${esc(row.carNo||row.acPlate1||"")}</td><td>${esc(atsEntryTime(row))}</td><td>${esc(row.differentTime||row.different_time||"")}</td><td>${esc(row.searchDate||"")}</td></tr>`).join(""); state.entryItems=data.items||[]; if(!state.entryItems.length) return msg("applyMsg","ATS에서 현재 입차 내역을 찾지 못했습니다. ATS 화면의 입차일과 차량번호를 다시 확인하세요.","bad"); msg("applyMsg",`ATS 입차 내역 ${state.entryItems.length}건을 찾았습니다. 적용할 행을 선택한 뒤 등록 요청을 누르세요.`,"ok"); }catch(e){ msg("applyMsg",e.message,"bad"); } }
-    function selectEntry(index){ state.selectedEntry=state.entryItems[index]; document.querySelectorAll("#entryRows tr").forEach((tr,i)=>tr.classList.toggle("selected",i===index)); const time=parseAtsEntryTime(atsEntryTime(state.selectedEntry)); if(time) entryTime.value=time; const selectedCar=state.selectedEntry.carNo||state.selectedEntry.acPlate1; if(selectedCar) carNumber.value=selectedCar; msg("applyMsg",`선택됨: 입차ID ${state.selectedEntry.id||state.selectedEntry.iID}, 차량 ${selectedCar||carNumber.value}`,"ok"); }
-    function previewDiscount(){ if(!entryTime.value) return msg("applyMsg","입차시간을 입력하세요.","bad"); const elapsed=Math.max(0,Math.ceil((Date.now()-new Date(entryTime.value).getTime())/60000)); const effective=elapsed+10, units=Math.min(48,Math.max(1,Math.floor(effective/30)+1)), c60=Math.floor(units/2), c30=units%2; msg("applyMsg",`경과 ${elapsed}분 + 출차 버퍼 10분 = 적용 기준 ${effective}분\n60분권: ${c60}장, 30분권: ${c30}장`,"note"); }
-    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("차량번호를 입력하세요."); if(!dept.value) throw new Error("선택 가능한 신청부서가 없습니다. 관리자에게 본부/부서 설정을 요청하세요."); if(!requester.value.trim()) throw new Error("신청자를 입력하세요."); if(!visitPurpose.value.trim()) throw new Error("방문목적을 입력하세요."); if(autoApply.value==="true" && !state.selectedEntry) throw new Error("먼저 입차 확인으로 ATS 입차 내역을 조회하고 적용할 행을 선택하세요."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`저장 완료 #${app.id}\n상태: ${statusLabels[app.status]||app.status}\n60분권: ${app.coupon_60_count}장, 30분권: ${app.coupon_30_count}장${app.failure_reason ? "\n사유: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); if(canViewStats()) await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    function clearSelectedEntry(){ state.selectedEntry=null; state.entryItems=[]; entryStatus.textContent="입차 확인 전"; entryStatus.className="field-note"; entryBox.classList.add("hidden"); entryRows.innerHTML=""; resetDiscountApplication(); }
+    function selectedEntryTime(){ if(!state.selectedEntry) return null; const value=parseAtsEntryTime(atsEntryTime(state.selectedEntry)); return value ? new Date(value) : null; }
+    function calculateDiscount(entry, exit){ const elapsed=Math.max(0,Math.ceil((exit.getTime()-entry.getTime())/60000)); const effective=elapsed+10, units=Math.min(48,Math.max(1,Math.floor(effective/30)+1)), c60=Math.floor(units/2), c30=units%2; return { elapsed, effective, c60, c30, amount:(c60*COUPON_60_PRICE)+(c30*COUPON_30_PRICE) }; }
+    function applyDiscountTime(){ try{ const entry=selectedEntryTime(); if(!entry) throw new Error("먼저 입차 확인을 완료하세요."); const exit=selectedExitTime(); if(exit < entry) throw new Error("출차 기한은 입차 시간 이후여야 합니다."); const plan=calculateDiscount(entry, exit); state.appliedExitTime=exit; state.appliedPlan=plan; exitDeadline.textContent=`출차 기한 ${formatTime(exit)} 적용 완료`; exitDeadline.className="field-note applied"; totalAmount.value=`${plan.amount.toLocaleString("ko-KR")}원 (60분 ${plan.c60}장, 30분 ${plan.c30}장)`; msg("applyMsg",`할인권 적용 완료\n출차 기한: ${formatTime(exit)}\n할인권 총 적용 금액: ${plan.amount.toLocaleString("ko-KR")}원`,"ok"); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    function buildApplicationPayload(){ const entry=selectedEntryTime(); return { car_number:carNumber.value.trim(), entry_time:entry ? entry.toISOString() : null, exit_time:state.appliedExitTime ? state.appliedExitTime.toISOString() : null, ats_entry_id:state.selectedEntry ? String(state.selectedEntry.id || state.selectedEntry.iID || "") : "", dept:dept.value, requester:requester.value.trim(), visitor_company:visitorCompany.value.trim(), visit_purpose:visitPurpose.value, auto_apply:true }; }
+    async function searchEntries(){ try{ if(!carNumber.value.trim()) throw new Error("차량번호를 입력하세요."); entryStatus.textContent="조회 중..."; msg("applyMsg","ATS 현재 입차 내역을 확인하고 있습니다...","note"); const params=new URLSearchParams({car_number:carNumber.value.trim(),entry_date:entryDateForAts()}); const data=await api(`/api/ats/entries?${params}`); entryBox.classList.remove("hidden"); state.selectedEntry=null; entryRows.innerHTML=(data.items||[]).map((row,idx)=>`<tr id="entryRow${idx}"><td><button class="ghost" onclick="selectEntry(${idx})">선택</button></td><td>${esc(row.id||row.iID||"")}</td><td>${esc(row.carNo||row.acPlate1||"")}</td><td>${esc(atsEntryTime(row))}</td><td>${esc(row.differentTime||row.different_time||"")}</td><td>${esc(row.searchDate||"")}</td></tr>`).join(""); state.entryItems=data.items||[]; if(!state.entryItems.length){ entryStatus.textContent="해당되는 내역이 없습니다."; entryStatus.className="field-note failed"; resetDiscountApplication(); return msg("applyMsg","해당되는 내역이 없습니다.","bad"); } selectEntry(0, true); entryStatus.textContent="확인 완료"; entryStatus.className="field-note succeeded"; msg("applyMsg",`확인 완료: ATS 입차 내역 ${state.entryItems.length}건이 조회되었습니다.`,"ok"); }catch(e){ entryStatus.textContent=e.message; entryStatus.className="field-note failed"; msg("applyMsg",e.message,"bad"); } }
+    function selectEntry(index, silent=false){ state.selectedEntry=state.entryItems[index]; document.querySelectorAll("#entryRows tr").forEach((tr,i)=>tr.classList.toggle("selected",i===index)); const selectedCar=state.selectedEntry.carNo||state.selectedEntry.acPlate1; if(selectedCar) carNumber.value=selectedCar; resetDiscountApplication(); const exit=selectedExitTime(); exitDeadline.textContent=`출차 기한 ${formatTime(exit)} - 할인권 미적용`; if(!silent) msg("applyMsg",`선택됨: 입차ID ${state.selectedEntry.id||state.selectedEntry.iID}, 차량 ${selectedCar||carNumber.value}`,"ok"); }
+    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("차량번호를 입력하세요."); if(!dept.value) throw new Error("선택 가능한 신청부서가 없습니다. 관리자에게 본부/부서 설정을 요청하세요."); if(!requester.value.trim()) throw new Error("신청자를 입력하세요."); if(!visitorCompany.value.trim()) throw new Error("방문업체를 입력하세요."); if(!visitPurpose.value) throw new Error("방문목적을 선택하세요."); if(!state.selectedEntry) throw new Error("먼저 입차 확인을 완료하세요."); if(!state.appliedExitTime || !state.appliedPlan) throw new Error("출차시간 우측의 할인권 적용 버튼을 눌러 적용 금액을 확정하세요."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`저장 완료 #${app.id}\n상태: ${statusLabels[app.status]||app.status}\n할인권 총 적용 금액: ${state.appliedPlan.amount.toLocaleString("ko-KR")}원\n60분권: ${app.coupon_60_count}장, 30분권: ${app.coupon_30_count}장${app.failure_reason ? "\n사유: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); if(canViewStats()) await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
     async function loadStats(){ const params=new URLSearchParams(); document.querySelectorAll(".filter-select").forEach(sel=>{ if(sel.value) params.set(sel.dataset.key,sel.value); }); const data=await api(`/api/stats?${params}`); state.rows=data.items; renderHistory(data); }
     function renderHistory(data){ columnToggles.innerHTML=columns.map(([k,l])=>`<th><label class="col-toggle"><input type="checkbox" checked data-col="${k}" onchange="renderHistoryFromState()"> ${l}</label></th>`).join(""); historyHead.innerHTML=columns.map(([k,l])=>`<th data-col="${k}">${l}</th>`).join(""); columnFilters.innerHTML=columns.map(([k])=>{ const filterable=["status","division","dept","requester","visitor_company","visit_purpose","email_status"].includes(k); if(!filterable) return `<th data-col="${k}"></th>`; const values=unique(state.rows.map(r=>r[k])); return `<th data-col="${k}"><select class="filter-select" data-key="${k}" onchange="loadStats()"><option value="">전체</option>${values.map(v=>`<option value="${esc(v)}">${esc(displayValue(k,v))}</option>`).join("")}</select></th>`; }).join(""); renderHistoryFromState(data); }
     function renderHistoryFromState(data=null){ const visible=new Set([...document.querySelectorAll("#columnToggles input")].filter(i=>i.checked).map(i=>i.dataset.col)); historyRows.innerHTML=state.rows.map(row=>`<tr>${columns.map(([k])=>`<td data-col="${k}" class="${esc(row[k])}">${esc(displayValue(k,row[k]))}</td>`).join("")}</tr>`).join(""); const summary=data||{count:state.rows.length,subtotal_effective_minutes:state.rows.reduce((s,r)=>s+r.effective_minutes,0),coupon_60_count:state.rows.reduce((s,r)=>s+r.coupon_60_count,0),coupon_30_count:state.rows.reduce((s,r)=>s+r.coupon_30_count,0)}; historyTotals.innerHTML=columns.map(([k])=>{ let v=""; if(k==="id") v=`건수 ${summary.count}`; if(k==="effective_minutes") v=`소계 ${summary.subtotal_effective_minutes}분`; if(k==="coupon_60_count") v=`${summary.coupon_60_count}`; if(k==="coupon_30_count") v=`${summary.coupon_30_count}`; return `<td data-col="${k}">${v}</td>`; }).join(""); document.querySelectorAll("[data-col]").forEach(el=>el.classList.toggle("hidden",!visible.has(el.dataset.col))); }
-    async function manualApply(){ try{ const minutes=manualMinutes.value; const data=await api(`/api/applications/${manualId.value}/manual-apply`,{method:"POST",body:JSON.stringify({reason:manualReason.value,effective_minutes:minutes?Number(minutes):null})}); msg("manualMsg",`수동 완료 처리 #${data.id}`,"ok"); if(canViewStats()) await loadStats(); }catch(e){ msg("manualMsg",e.message,"bad"); } }
     function fillSelect(el, rows, fallback){ el.innerHTML=rows.filter(r=>r.is_active).map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join("")||`<option value="${esc(fallback)}">${esc(fallback)}</option>`; }
     function fillDepartmentSelect(el, rows, fallback){ const options=rows.filter(r=>r.is_active).map(r=>`<option value="${esc(r.name)}">${esc(r.division ? r.division + ' / ' : '')}${esc(r.name)}</option>`).join(""); el.innerHTML=options||`<option value="">${esc(fallback)}</option>`; }
     function renderDivisionRows(){ const el=document.getElementById("divisionRows"); if(!el) return; el.innerHTML=state.divisions.map(r=>`<tr><td>${r.id}</td><td><input id="divisionEdit${r.id}" value="${esc(r.name)}"></td><td><button class="ghost" onclick="updateDivision(${r.id})">수정</button> <button class="danger" onclick="deleteDivision(${r.id})">삭제</button></td></tr>`).join(""); }
@@ -254,7 +274,14 @@
     async function createEmail(){ try{ if(!emailAddress.value.trim()) throw new Error("이메일을 입력하세요."); await api("/api/email-recipients",{method:"POST",body:JSON.stringify({email:emailAddress.value.trim(),name:emailName.value.trim()})}); emailAddress.value=""; emailName.value=""; await loadEmails(); msg("emailMsg","이메일이 저장되었습니다.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     async function deleteEmail(id){ try{ await api(`/api/email-recipients/${id}`,{method:"DELETE"}); await loadEmails(); msg("emailMsg","이메일이 삭제되었습니다.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     carNumber.addEventListener("input", clearSelectedEntry);
-    entryTime.addEventListener("change", clearSelectedEntry);
+    exitOption.addEventListener("change", () => updateExitDeadline(true));
+    directExitTime.addEventListener("change", () => updateExitDeadline(false));
+    document.getElementById("tab-apply").addEventListener("keydown", event => {
+      if(event.key === "Enter"){
+        event.preventDefault();
+        createApplication();
+      }
+    });
     if(state.token) enterApp().catch(()=>logout());
   </script>
 </body>

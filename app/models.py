@@ -73,10 +73,11 @@ class EmailSettingsUpdate(BaseModel):
 class ParkingApplicationCreate(BaseModel):
     car_number: str = Field(min_length=2, max_length=30)
     entry_time: datetime | None = None
+    exit_time: datetime | None = None
     ats_entry_id: str = ""
     dept: str = Field(min_length=1, max_length=80)
     requester: str = Field(min_length=1, max_length=80)
-    visitor_company: str = ""
+    visitor_company: str = Field(min_length=1, max_length=120)
     visit_purpose: str = Field(min_length=1, max_length=200)
     auto_apply: bool = True
 
