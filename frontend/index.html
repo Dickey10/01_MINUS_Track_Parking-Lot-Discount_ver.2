@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ATS Parking Discount</title>
+  <title>ATS 주차 할인권 등록</title>
   <style>
     :root { --bg:#f6f7f9; --panel:#fff; --ink:#111827; --line:#d7dce3; --blue:#2563eb; --red:#c03221; --green:#12805c; --amber:#a15c00; }
     * { box-sizing:border-box; }
@@ -55,50 +55,51 @@
 </head>
 <body>
   <header>
-    <h1>ATS Parking Discount</h1>
-    <div id="userBar" class="hidden"><span id="userName"></span> <button class="ghost" onclick="logout()">Logout</button></div>
+    <h1>ATS 주차 할인권 등록</h1>
+    <div id="userBar" class="hidden"><span id="userName"></span> <button class="ghost" onclick="logout()">로그아웃</button></div>
   </header>
   <main>
     <div id="loginView" class="login">
-      <h2>Login</h2>
-      <label>ID<input id="loginUsername" autocomplete="username" value="admin"></label>
-      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" value="admin1234"></label>
-      <div class="actions"><button onclick="login()">Login</button></div>
+      <h2>로그인</h2>
+      <label>아이디<input id="loginUsername" autocomplete="username" value="admin"></label>
+      <label>비밀번호<input id="loginPassword" type="password" autocomplete="current-password" value="admin1234"></label>
+      <div class="actions"><button onclick="login()">로그인</button></div>
       <div id="loginMsg" class="message"></div>
     </div>
 
     <div id="appView" class="layout hidden">
       <nav>
-        <button data-tab="apply" class="active" onclick="showTab('apply')">Discount Request</button>
-        <button data-tab="history" onclick="showTab('history')">History / Stats</button>
-        <button data-tab="manual" onclick="showTab('manual')">Manual Apply</button>
-        <button data-tab="accounts" class="admin-only" onclick="showTab('accounts')">Accounts</button>
-        <button data-tab="departments" class="admin-only" onclick="showTab('departments')">Departments</button>
-        <button data-tab="emails" class="admin-only" onclick="showTab('emails')">Result Emails</button>
+        <button data-tab="apply" class="active" onclick="showTab('apply')">주차등록</button>
+        <button data-tab="history" class="stats-only" onclick="showTab('history')">결과 조회/통계</button>
+        <button data-tab="manual" onclick="showTab('manual')">수동등록</button>
+        <button data-tab="password" onclick="showTab('password')">비밀번호 변경</button>
+        <button data-tab="accounts" class="admin-only" onclick="showTab('accounts')">계정 관리</button>
+        <button data-tab="departments" class="admin-only" onclick="showTab('departments')">본부/부서 관리</button>
+        <button data-tab="emails" class="admin-only" onclick="showTab('emails')">결과 이메일</button>
       </nav>
       <div>
         <section id="tab-apply" class="active">
-          <h2>Visitor Parking Discount Request</h2>
+          <h2>방문차량 주차 할인권 신청</h2>
           <div class="form-grid">
-            <label>Car Number<input id="carNumber" placeholder="12A3456"></label>
-            <label>Entry Time<input id="entryTime" type="datetime-local"></label>
-            <label>Department<select id="dept"></select></label>
-            <label>Requester<input id="requester" placeholder="Name"></label>
-            <label>Visitor Company<input id="visitorCompany" placeholder="Company"></label>
-            <label>Visit Purpose<input id="visitPurpose" placeholder="Meeting"></label>
-            <label>Mode<select id="autoApply"><option value="true">Apply to ATS</option><option value="false">Save only</option></select></label>
+            <label>차량번호<input id="carNumber" placeholder="12가3456"></label>
+            <label>입차시간<input id="entryTime" type="datetime-local"></label>
+            <label>신청부서<select id="dept"></select></label>
+            <label>신청자<input id="requester" placeholder="이름"></label>
+            <label>방문업체<input id="visitorCompany" placeholder="업체명"></label>
+            <label>방문목적<input id="visitPurpose" placeholder="회의"></label>
+            <label>처리방식<select id="autoApply"><option value="true">ATS 자동 적용</option><option value="false">신청만 저장</option></select></label>
           </div>
-          <div class="actions"><button class="ghost" onclick="searchEntries()">Check Entry</button><button onclick="createApplication()">Submit</button><button class="ghost" onclick="previewDiscount()">Preview Coupons</button></div>
+          <div class="actions"><button class="ghost" onclick="searchEntries()">입차 확인</button><button onclick="createApplication()">등록 요청</button><button class="ghost" onclick="previewDiscount()">할인권 미리보기</button></div>
           <div id="entryBox" class="entry-box hidden">
-            <h3>ATS Current Entries</h3>
-            <div class="excel-wrap"><table class="excel"><thead><tr><th>Select</th><th>Entry ID</th><th>Car</th><th>Entry Time</th><th>Parking Time</th><th>Search Date</th></tr></thead><tbody id="entryRows"></tbody></table></div>
+            <h3>ATS 현재 입차 내역</h3>
+            <div class="excel-wrap"><table class="excel"><thead><tr><th>선택</th><th>입차ID</th><th>차량번호</th><th>입차시간</th><th>주차시간</th><th>조회일</th></tr></thead><tbody id="entryRows"></tbody></table></div>
           </div>
           <div id="applyMsg" class="message"></div>
         </section>
 
-        <section id="tab-history">
-          <h2>History / Usage Statistics</h2>
-          <p class="note message show">Default view shows only pending requests and completed registrations. Failed connection/registration rows are excluded.</p>
+        <section id="tab-history" class="stats-only">
+          <h2>결과 조회/사용 현황 통계</h2>
+          <p class="note message show">기본 화면에는 등록 대기중 및 등록 완료 건만 표시됩니다. 접속/등록 실패 건은 제외됩니다.</p>
           <div class="excel-wrap">
             <table class="excel" id="historyTable">
               <thead><tr id="columnToggles"></tr><tr class="filter-row" id="columnFilters"></tr><tr id="historyHead"></tr></thead>
@@ -109,82 +110,106 @@
         </section>
 
         <section id="tab-manual">
-          <h2>Manual Apply</h2>
+          <h2>수동등록</h2>
           <div class="form-grid">
-            <label>Application ID<input id="manualId" type="number"></label>
-            <label>Reason<input id="manualReason" value="Applied manually in ATS"></label>
-            <label>Elapsed Minutes<input id="manualMinutes" type="number" placeholder="Optional"></label>
+            <label>신청 ID<input id="manualId" type="number"></label>
+            <label>처리 사유<input id="manualReason" value="ATS에서 수동 적용 완료"></label>
+            <label>적용 기준 시간(분)<input id="manualMinutes" type="number" placeholder="선택 입력"></label>
           </div>
-          <div class="actions"><button onclick="manualApply()">Mark Manual Complete</button></div>
+          <div class="actions"><button onclick="manualApply()">수동 완료 처리</button></div>
           <div id="manualMsg" class="message"></div>
         </section>
 
-        <section id="tab-accounts" class="admin-only">
-          <h2>Account Management</h2>
-          <div class="form-grid three">
-            <label>ID<input id="accountUsername"></label>
-            <label>Initial Password<input id="accountPassword" type="password" placeholder="8+ characters"></label>
-            <label>Display Name<input id="accountName"></label>
-            <label>Division<select id="accountDivision"></select></label>
-            <label>Department<select id="accountDept"></select></label>
-            <label>Role<select id="accountRole"><option value="super_admin">Super Admin</option><option value="division_admin">Division Admin</option><option value="user" selected>User</option><option value="inactive">Inactive</option></select></label>
-          </div>
-          <div class="actions"><button onclick="createAccount()">Save Account</button></div>
-          <h3>Add Dropdown Values</h3>
+        <section id="tab-password">
+          <h2>비밀번호 변경</h2>
+          <p class="note message show">새 비밀번호는 8자 이상이며 영문 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.</p>
           <div class="form-grid">
-            <label>New Division<input id="divisionName" placeholder="Management Division"></label>
-            <label>New Department<input id="departmentNameInline" placeholder="Management Team"></label>
+            <label>변경 대상 계정<select id="passwordAccount"></select></label>
+            <label>현재 비밀번호<input id="currentPassword" type="password" autocomplete="current-password"></label>
+            <label>새 비밀번호<input id="newPassword" type="password" autocomplete="new-password"></label>
+            <label>새 비밀번호 재확인<input id="confirmPassword" type="password" autocomplete="new-password"></label>
           </div>
-          <div class="actions"><button class="ghost" onclick="createDivision()">Add Division</button><button class="ghost" onclick="createDepartmentInline()">Add Department</button></div>
+          <div class="actions"><button onclick="changePassword()">비밀번호 변경</button></div>
+          <div id="passwordMsg" class="message"></div>
+        </section>
+
+        <section id="tab-accounts" class="admin-only">
+          <h2>계정 관리</h2>
+          <div class="form-grid three">
+            <label>아이디<input id="accountUsername"></label>
+            <label>초기 비밀번호<input id="accountPassword" type="password" placeholder="8자 이상"></label>
+            <label>표시 이름<input id="accountName"></label>
+            <label>본부<select id="accountDivision"></select></label>
+            <label>부서<select id="accountDept"></select></label>
+            <label>권한<select id="accountRole"><option value="super_admin">총 관리자</option><option value="division_admin">본부 관리자</option><option value="user" selected>사용자</option><option value="inactive">비활성화</option></select></label>
+          </div>
+          <div class="actions"><button onclick="createAccount()">계정 저장</button></div>
+          <h3>드롭다운 값 추가</h3>
+          <div class="form-grid">
+            <label>새 본부<input id="divisionName" placeholder="관리본부"></label>
+            <label>새 부서<input id="departmentNameInline" placeholder="경영관리팀"></label>
+          </div>
+          <div class="actions"><button class="ghost" onclick="createDivision()">본부 추가</button><button class="ghost" onclick="createDepartmentInline()">부서 추가</button></div>
           <div id="accountMsg" class="message"></div>
-          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>Username</th><th>Name</th><th>Division</th><th>Department</th><th>Role</th><th>Status</th><th>Action</th></tr></thead><tbody id="accountRows"></tbody></table></div>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>아이디</th><th>이름</th><th>본부</th><th>부서</th><th>권한</th><th>상태</th><th>작업</th></tr></thead><tbody id="accountRows"></tbody></table></div>
         </section>
 
         <section id="tab-departments" class="admin-only">
-          <h2>Department Management</h2>
-          <div class="form-grid"><label>Department Name<input id="departmentName"></label></div>
-          <div class="actions"><button onclick="createDepartment()">Add Department</button></div>
+          <h2>본부/부서 관리</h2>
+          <div class="form-grid"><label>본부<select id="departmentDivision"></select></label><label>부서<input id="departmentName"></label></div>
+          <div class="actions"><button onclick="createDepartment()">부서 추가</button></div>
           <div id="departmentMsg" class="message"></div>
-          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead><tbody id="departmentRows"></tbody></table></div>
+          <h3>본부 관리</h3>
+          <div class="form-grid"><label>새 본부<input id="divisionNameManage" placeholder="예: 영업본부"></label></div>
+          <div class="actions"><button class="ghost" onclick="createDivisionFromManage()">본부 추가</button></div>
+          <div id="divisionMsg" class="message"></div>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>본부명</th><th>작업</th></tr></thead><tbody id="divisionRows"></tbody></table></div>
+          <h3>부서 관리</h3>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>본부 설정</th><th>부서</th><th>작업</th></tr></thead><tbody id="departmentRows"></tbody></table></div>
         </section>
 
         <section id="tab-emails" class="admin-only">
-          <h2>Result Email Recipients</h2>
-          <h3>Sender SMTP Settings</h3>
-          <p class="note message show">For Gmail or Google Workspace, use an app password instead of the normal login password.</p>
+          <h2>결과 이메일</h2>
+          <h3>발신 SMTP 설정</h3>
+          <p class="note message show">Gmail 또는 Google Workspace는 일반 로그인 비밀번호가 아니라 앱 비밀번호를 사용하세요.</p>
           <div class="form-grid three">
-            <label>SMTP Host<input id="smtpHost" value="smtp.gmail.com"></label>
-            <label>SMTP Port<input id="smtpPort" type="number" value="587"></label>
-            <label>Sender Email<input id="smtpUser" type="email" placeholder="sender@example.com"></label>
-            <label>App Password<input id="smtpPassword" type="password" placeholder="Leave blank to keep current password"></label>
-            <label>Failure Alert Email<input id="alertEmail" type="email" placeholder="Optional"></label>
+            <label>SMTP 호스트<input id="smtpHost" value="smtp.gmail.com"></label>
+            <label>SMTP 포트<input id="smtpPort" type="number" value="587"></label>
+            <label>발신 이메일<input id="smtpUser" type="email" placeholder="sender@example.com"></label>
+            <label>앱 비밀번호<input id="smtpPassword" type="password" placeholder="기존 비밀번호 유지 시 빈칸"></label>
+            <label>실패 알림 이메일<input id="alertEmail" type="email" placeholder="선택 입력"></label>
           </div>
-          <div class="actions"><button onclick="saveEmailSettings()">Save SMTP Settings</button></div>
-          <h3>Resend Result Email</h3>
-          <div class="form-grid"><label>Application ID<input id="resendApplicationId" type="number" placeholder="History ID"></label></div>
-          <div class="actions"><button class="ghost" onclick="resendResultEmail()">Resend Email</button></div>
-          <h3>Recipients</h3>
-          <div class="form-grid"><label>Email<input id="emailAddress" type="email"></label><label>Name<input id="emailName" placeholder="General Affairs"></label></div>
-          <div class="actions"><button onclick="createEmail()">Add Email</button></div>
+          <div class="actions"><button onclick="saveEmailSettings()">SMTP 설정 저장</button></div>
+          <h3>결과 이메일 재발송</h3>
+          <div class="form-grid"><label>신청 ID<input id="resendApplicationId" type="number" placeholder="결과 조회 ID"></label></div>
+          <div class="actions"><button class="ghost" onclick="resendResultEmail()">이메일 재발송</button></div>
+          <h3>수신자</h3>
+          <div class="form-grid"><label>이메일<input id="emailAddress" type="email"></label><label>이름<input id="emailName" placeholder="총무 담당"></label></div>
+          <div class="actions"><button onclick="createEmail()">이메일 추가</button></div>
           <div id="emailMsg" class="message"></div>
-          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Action</th></tr></thead><tbody id="emailRows"></tbody></table></div>
+          <div class="excel-wrap"><table class="excel"><thead><tr><th>ID</th><th>이메일</th><th>이름</th><th>작업</th></tr></thead><tbody id="emailRows"></tbody></table></div>
         </section>
       </div>
     </div>
   </main>
   <script>
-    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [], selectedEntry: null };
-    const roleLabels = { super_admin:"Super Admin", admin:"Super Admin", division_admin:"Division Admin", user:"User", manager:"User", inactive:"Inactive" };
-    const statusLabels = { pending:"Pending", succeeded:"Completed" };
-    const columns = [["id","ID"],["status","Status"],["car_number","Car"],["division","Division"],["dept","Department"],["requester","Requester"],["visitor_company","Company"],["visit_purpose","Purpose"],["entry_time","Entry Time"],["effective_minutes","Total Minutes"],["coupon_60_count","60m"],["coupon_30_count","30m"],["email_status","Email"],["failure_reason","Failure"]];
+    const state = { token: localStorage.getItem("atsToken"), user: null, rows: [], departments: [], divisions: [], selectedEntry: null, logoutTimer: null };
+    const roleLabels = { super_admin:"총 관리자", admin:"총 관리자", division_admin:"본부 관리자", user:"사용자", manager:"사용자", inactive:"비활성화" };
+    const statusLabels = { pending:"등록 대기중", processing:"처리중", succeeded:"등록 완료", failed:"등록 실패", manual:"수동 완료", sent:"발송 완료", not_sent:"미발송" };
+    const emailLabels = { sent:"발송 완료", failed:"발송 실패", not_sent:"미발송" };
+    const columns = [["id","ID"],["status","상태"],["car_number","차량번호"],["division","본부"],["dept","부서"],["requester","신청자"],["visitor_company","방문업체"],["visit_purpose","방문목적"],["entry_time","입차시간"],["effective_minutes","총 적용분"],["coupon_60_count","60분권"],["coupon_30_count","30분권"],["email_status","이메일"],["failure_reason","실패 사유"]];
     function headers(){ return { "Content-Type":"application/json", "Authorization":`Bearer ${state.token}` }; }
-    async function api(path, options={}){ const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}}); const text=await res.text(); let data={}; try{data=text?JSON.parse(text):{};}catch{data={detail:text||res.statusText};} if(!res.ok) throw new Error(data.detail||data.message||res.statusText); return data; }
+    async function api(path, options={}){ const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}}); const text=await res.text(); let data={}; try{data=text?JSON.parse(text):{};}catch{data={detail:text||res.statusText};} if(res.status===401){ alert("로그인 후 10분이 경과했거나 인증이 만료되었습니다. 다시 로그인하세요."); logout(); return {}; } if(!res.ok) throw new Error(data.detail||data.message||res.statusText); return data; }
     function msg(id,text,type="ok"){ const el=document.getElementById(id); el.className=`message show ${type}`; el.textContent=text; }
     function esc(v){ return String(v ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+    function displayValue(key,value){ if(key==="email_status") return emailLabels[value]||value; if(key==="status") return statusLabels[value]||value; return value; }
     function unique(values){ return [...new Set(values.filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(String))].sort(); }
-    async function login(){ try{ const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:loginUsername.value.trim(),password:loginPassword.value})}); const data=await res.json(); if(!res.ok) throw new Error(data.detail||"Login failed"); state.token=data.token; state.user=data.user; localStorage.setItem("atsToken",state.token); await enterApp(); }catch(e){ msg("loginMsg",e.message,"bad"); } }
-    function logout(){ localStorage.removeItem("atsToken"); location.reload(); }
-    async function enterApp(){ if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!["super_admin","admin"].includes(state.user.role))); setDefaultEntryTime(); await Promise.all([loadDivisions(),loadDepartments(),loadStats()]); if(["super_admin","admin"].includes(state.user.role)) await Promise.all([loadAccounts(),loadEmails(),loadEmailSettings()]); }
+    function isAdminUser(){ return ["super_admin","admin"].includes(state.user?.role); }
+    function canViewStats(){ return state.user?.role !== "user"; }
+    function startLogoutTimer(){ clearTimeout(state.logoutTimer); state.logoutTimer=setTimeout(()=>{ alert("로그인 후 10분이 경과하여 자동 로그아웃됩니다."); logout(); }, 10*60*1000); }
+    async function login(){ try{ const res=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:loginUsername.value.trim(),password:loginPassword.value})}); const data=await res.json(); if(!res.ok) throw new Error(data.detail||"로그인에 실패했습니다."); state.token=data.token; state.user=data.user; localStorage.setItem("atsToken",state.token); localStorage.setItem("atsLoginAt",String(Date.now())); startLogoutTimer(); await enterApp(); }catch(e){ msg("loginMsg",e.message,"bad"); } }
+    function logout(){ localStorage.removeItem("atsToken"); localStorage.removeItem("atsLoginAt"); location.reload(); }
+    async function enterApp(){ const loginAt=Number(localStorage.getItem("atsLoginAt")||Date.now()); if(Date.now()-loginAt>=10*60*1000) return logout(); startLogoutTimer(); if(!state.user) state.user=await api("/api/me"); loginView.classList.add("hidden"); appView.classList.remove("hidden"); userBar.classList.remove("hidden"); userName.textContent=`${state.user.display_name} (${roleLabels[state.user.role]||state.user.role})`; document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",!isAdminUser())); document.querySelectorAll(".stats-only").forEach(el=>el.classList.toggle("hidden",!canViewStats())); setDefaultEntryTime(); await loadDivisions(); await loadDepartments(); await loadPasswordTargets(); if(canViewStats()) await loadStats(); if(isAdminUser()) await Promise.all([loadAccounts(),loadEmails(),loadEmailSettings()]); }
     function showTab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name)); document.querySelectorAll("section").forEach(s=>s.classList.toggle("active",s.id===`tab-${name}`)); }
     function setDefaultEntryTime(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); entryTime.value=d.toISOString().slice(0,16); }
     function entryDateForAts(){ return entryTime.value ? entryTime.value.slice(0,10).replaceAll("-","") : ""; }
@@ -192,30 +217,42 @@
     function parseAtsEntryTime(value){ const raw=String(value||"").replace(/\D/g,""); if(raw.length<12) return ""; return `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}T${raw.slice(8,10)}:${raw.slice(10,12)}`; }
     function clearSelectedEntry(){ state.selectedEntry=null; entryBox.classList.add("hidden"); entryRows.innerHTML=""; }
     function buildApplicationPayload(){ return { car_number:carNumber.value.trim(), entry_time:entryTime.value?new Date(entryTime.value).toISOString():null, ats_entry_id:state.selectedEntry ? String(state.selectedEntry.id || state.selectedEntry.iID || "") : "", dept:dept.value, requester:requester.value.trim(), visitor_company:visitorCompany.value.trim(), visit_purpose:visitPurpose.value.trim(), auto_apply:autoApply.value==="true" }; }
-    async function searchEntries(){ try{ if(!carNumber.value.trim()) throw new Error("Enter car number."); msg("applyMsg","Checking ATS current entries...","note"); const params=new URLSearchParams({car_number:carNumber.value.trim(),entry_date:entryDateForAts()}); const data=await api(`/api/ats/entries?${params}`); entryBox.classList.remove("hidden"); state.selectedEntry=null; entryRows.innerHTML=(data.items||[]).map((row,idx)=>`<tr id="entryRow${idx}"><td><button class="ghost" onclick="selectEntry(${idx})">Select</button></td><td>${esc(row.id||row.iID||"")}</td><td>${esc(row.carNo||row.acPlate1||"")}</td><td>${esc(atsEntryTime(row))}</td><td>${esc(row.differentTime||row.different_time||"")}</td><td>${esc(row.searchDate||"")}</td></tr>`).join(""); state.entryItems=data.items||[]; if(!state.entryItems.length) return msg("applyMsg","ATS에서 현재 입차 내역을 찾지 못했습니다. ATS 화면의 입차일과 차량번호를 다시 확인하세요.","bad"); msg("applyMsg",`ATS 입차 내역 ${state.entryItems.length}건을 찾았습니다. 적용할 행을 선택한 뒤 Submit을 누르세요.`,"ok"); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    async function searchEntries(){ try{ if(!carNumber.value.trim()) throw new Error("차량번호를 입력하세요."); msg("applyMsg","ATS 현재 입차 내역을 확인하고 있습니다...","note"); const params=new URLSearchParams({car_number:carNumber.value.trim(),entry_date:entryDateForAts()}); const data=await api(`/api/ats/entries?${params}`); entryBox.classList.remove("hidden"); state.selectedEntry=null; entryRows.innerHTML=(data.items||[]).map((row,idx)=>`<tr id="entryRow${idx}"><td><button class="ghost" onclick="selectEntry(${idx})">선택</button></td><td>${esc(row.id||row.iID||"")}</td><td>${esc(row.carNo||row.acPlate1||"")}</td><td>${esc(atsEntryTime(row))}</td><td>${esc(row.differentTime||row.different_time||"")}</td><td>${esc(row.searchDate||"")}</td></tr>`).join(""); state.entryItems=data.items||[]; if(!state.entryItems.length) return msg("applyMsg","ATS에서 현재 입차 내역을 찾지 못했습니다. ATS 화면의 입차일과 차량번호를 다시 확인하세요.","bad"); msg("applyMsg",`ATS 입차 내역 ${state.entryItems.length}건을 찾았습니다. 적용할 행을 선택한 뒤 등록 요청을 누르세요.`,"ok"); }catch(e){ msg("applyMsg",e.message,"bad"); } }
     function selectEntry(index){ state.selectedEntry=state.entryItems[index]; document.querySelectorAll("#entryRows tr").forEach((tr,i)=>tr.classList.toggle("selected",i===index)); const time=parseAtsEntryTime(atsEntryTime(state.selectedEntry)); if(time) entryTime.value=time; const selectedCar=state.selectedEntry.carNo||state.selectedEntry.acPlate1; if(selectedCar) carNumber.value=selectedCar; msg("applyMsg",`선택됨: 입차ID ${state.selectedEntry.id||state.selectedEntry.iID}, 차량 ${selectedCar||carNumber.value}`,"ok"); }
-    function previewDiscount(){ if(!entryTime.value) return msg("applyMsg","Enter entry time.","bad"); const elapsed=Math.max(0,Math.ceil((Date.now()-new Date(entryTime.value).getTime())/60000)); const effective=elapsed+10, units=Math.min(48,Math.max(1,Math.floor(effective/30)+1)), c60=Math.floor(units/2), c30=units%2; msg("applyMsg",`Elapsed ${elapsed}m + exit buffer 10m = ${effective}m\n60m coupons: ${c60}, 30m coupons: ${c30}`,"note"); }
-    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("Enter car number."); if(!requester.value.trim()) throw new Error("Enter requester."); if(!visitPurpose.value.trim()) throw new Error("Enter visit purpose."); if(autoApply.value==="true" && !state.selectedEntry) throw new Error("먼저 Check Entry로 ATS 입차 내역을 조회하고 적용할 행을 선택하세요."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`Saved #${app.id}\nStatus: ${statusLabels[app.status]||app.status}\n60m: ${app.coupon_60_count}, 30m: ${app.coupon_30_count}${app.failure_reason ? "\nReason: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
+    function previewDiscount(){ if(!entryTime.value) return msg("applyMsg","입차시간을 입력하세요.","bad"); const elapsed=Math.max(0,Math.ceil((Date.now()-new Date(entryTime.value).getTime())/60000)); const effective=elapsed+10, units=Math.min(48,Math.max(1,Math.floor(effective/30)+1)), c60=Math.floor(units/2), c30=units%2; msg("applyMsg",`경과 ${elapsed}분 + 출차 버퍼 10분 = 적용 기준 ${effective}분\n60분권: ${c60}장, 30분권: ${c30}장`,"note"); }
+    async function createApplication(){ try{ if(!carNumber.value.trim()) throw new Error("차량번호를 입력하세요."); if(!dept.value) throw new Error("선택 가능한 신청부서가 없습니다. 관리자에게 본부/부서 설정을 요청하세요."); if(!requester.value.trim()) throw new Error("신청자를 입력하세요."); if(!visitPurpose.value.trim()) throw new Error("방문목적을 입력하세요."); if(autoApply.value==="true" && !state.selectedEntry) throw new Error("먼저 입차 확인으로 ATS 입차 내역을 조회하고 적용할 행을 선택하세요."); const app=await api("/api/applications",{method:"POST",body:JSON.stringify(buildApplicationPayload())}); msg("applyMsg",`저장 완료 #${app.id}\n상태: ${statusLabels[app.status]||app.status}\n60분권: ${app.coupon_60_count}장, 30분권: ${app.coupon_30_count}장${app.failure_reason ? "\n사유: "+app.failure_reason : ""}`, app.status==="failed"?"bad":"ok"); if(canViewStats()) await loadStats(); }catch(e){ msg("applyMsg",e.message,"bad"); } }
     async function loadStats(){ const params=new URLSearchParams(); document.querySelectorAll(".filter-select").forEach(sel=>{ if(sel.value) params.set(sel.dataset.key,sel.value); }); const data=await api(`/api/stats?${params}`); state.rows=data.items; renderHistory(data); }
-    function renderHistory(data){ columnToggles.innerHTML=columns.map(([k,l])=>`<th><label class="col-toggle"><input type="checkbox" checked data-col="${k}" onchange="renderHistoryFromState()"> ${l}</label></th>`).join(""); historyHead.innerHTML=columns.map(([k,l])=>`<th data-col="${k}">${l}</th>`).join(""); columnFilters.innerHTML=columns.map(([k])=>{ const filterable=["status","division","dept","requester","visitor_company","visit_purpose","email_status"].includes(k); if(!filterable) return `<th data-col="${k}"></th>`; const values=unique(state.rows.map(r=>r[k])); return `<th data-col="${k}"><select class="filter-select" data-key="${k}" onchange="loadStats()"><option value="">All</option>${values.map(v=>`<option value="${esc(v)}">${esc(statusLabels[v]||v)}</option>`).join("")}</select></th>`; }).join(""); renderHistoryFromState(data); }
-    function renderHistoryFromState(data=null){ const visible=new Set([...document.querySelectorAll("#columnToggles input")].filter(i=>i.checked).map(i=>i.dataset.col)); historyRows.innerHTML=state.rows.map(row=>`<tr>${columns.map(([k])=>`<td data-col="${k}" class="${esc(row[k])}">${esc(statusLabels[row[k]]||row[k])}</td>`).join("")}</tr>`).join(""); const summary=data||{count:state.rows.length,subtotal_effective_minutes:state.rows.reduce((s,r)=>s+r.effective_minutes,0),coupon_60_count:state.rows.reduce((s,r)=>s+r.coupon_60_count,0),coupon_30_count:state.rows.reduce((s,r)=>s+r.coupon_30_count,0)}; historyTotals.innerHTML=columns.map(([k])=>{ let v=""; if(k==="id") v=`Count ${summary.count}`; if(k==="effective_minutes") v=`Subtotal ${summary.subtotal_effective_minutes}m`; if(k==="coupon_60_count") v=`${summary.coupon_60_count}`; if(k==="coupon_30_count") v=`${summary.coupon_30_count}`; return `<td data-col="${k}">${v}</td>`; }).join(""); document.querySelectorAll("[data-col]").forEach(el=>el.classList.toggle("hidden",!visible.has(el.dataset.col))); }
-    async function manualApply(){ try{ const minutes=manualMinutes.value; const data=await api(`/api/applications/${manualId.value}/manual-apply`,{method:"POST",body:JSON.stringify({reason:manualReason.value,effective_minutes:minutes?Number(minutes):null})}); msg("manualMsg",`Manual complete #${data.id}`,"ok"); await loadStats(); }catch(e){ msg("manualMsg",e.message,"bad"); } }
+    function renderHistory(data){ columnToggles.innerHTML=columns.map(([k,l])=>`<th><label class="col-toggle"><input type="checkbox" checked data-col="${k}" onchange="renderHistoryFromState()"> ${l}</label></th>`).join(""); historyHead.innerHTML=columns.map(([k,l])=>`<th data-col="${k}">${l}</th>`).join(""); columnFilters.innerHTML=columns.map(([k])=>{ const filterable=["status","division","dept","requester","visitor_company","visit_purpose","email_status"].includes(k); if(!filterable) return `<th data-col="${k}"></th>`; const values=unique(state.rows.map(r=>r[k])); return `<th data-col="${k}"><select class="filter-select" data-key="${k}" onchange="loadStats()"><option value="">전체</option>${values.map(v=>`<option value="${esc(v)}">${esc(displayValue(k,v))}</option>`).join("")}</select></th>`; }).join(""); renderHistoryFromState(data); }
+    function renderHistoryFromState(data=null){ const visible=new Set([...document.querySelectorAll("#columnToggles input")].filter(i=>i.checked).map(i=>i.dataset.col)); historyRows.innerHTML=state.rows.map(row=>`<tr>${columns.map(([k])=>`<td data-col="${k}" class="${esc(row[k])}">${esc(displayValue(k,row[k]))}</td>`).join("")}</tr>`).join(""); const summary=data||{count:state.rows.length,subtotal_effective_minutes:state.rows.reduce((s,r)=>s+r.effective_minutes,0),coupon_60_count:state.rows.reduce((s,r)=>s+r.coupon_60_count,0),coupon_30_count:state.rows.reduce((s,r)=>s+r.coupon_30_count,0)}; historyTotals.innerHTML=columns.map(([k])=>{ let v=""; if(k==="id") v=`건수 ${summary.count}`; if(k==="effective_minutes") v=`소계 ${summary.subtotal_effective_minutes}분`; if(k==="coupon_60_count") v=`${summary.coupon_60_count}`; if(k==="coupon_30_count") v=`${summary.coupon_30_count}`; return `<td data-col="${k}">${v}</td>`; }).join(""); document.querySelectorAll("[data-col]").forEach(el=>el.classList.toggle("hidden",!visible.has(el.dataset.col))); }
+    async function manualApply(){ try{ const minutes=manualMinutes.value; const data=await api(`/api/applications/${manualId.value}/manual-apply`,{method:"POST",body:JSON.stringify({reason:manualReason.value,effective_minutes:minutes?Number(minutes):null})}); msg("manualMsg",`수동 완료 처리 #${data.id}`,"ok"); if(canViewStats()) await loadStats(); }catch(e){ msg("manualMsg",e.message,"bad"); } }
     function fillSelect(el, rows, fallback){ el.innerHTML=rows.filter(r=>r.is_active).map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join("")||`<option value="${esc(fallback)}">${esc(fallback)}</option>`; }
-    async function loadDivisions(){ state.divisions=await api("/api/divisions"); fillSelect(accountDivision,state.divisions,"Management Division"); }
-    async function loadDepartments(){ state.departments=await api("/api/departments"); fillSelect(dept,state.departments,"General Affairs"); fillSelect(accountDept,state.departments,"Management Team"); departmentRows.innerHTML=state.departments.map(r=>`<tr><td>${r.id}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteDepartment(${r.id})">Delete</button></td></tr>`).join(""); }
-    async function createDivision(){ try{ if(!divisionName.value.trim()) throw new Error("Enter division name."); await api("/api/divisions",{method:"POST",body:JSON.stringify({name:divisionName.value.trim()})}); divisionName.value=""; await loadDivisions(); msg("accountMsg","Division saved.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
-    async function createDepartmentInline(){ departmentName.value=departmentNameInline.value; await createDepartment("accountMsg"); departmentNameInline.value=""; }
-    async function createDepartment(messageId="departmentMsg"){ try{ if(!departmentName.value.trim()) throw new Error("Enter department name."); await api("/api/departments",{method:"POST",body:JSON.stringify({name:departmentName.value.trim()})}); departmentName.value=""; await loadDepartments(); msg(messageId,"Department saved.","ok"); }catch(e){ msg(messageId,e.message,"bad"); } }
-    async function deleteDepartment(id){ try{ await api(`/api/departments/${id}`,{method:"DELETE"}); await loadDepartments(); msg("departmentMsg","Department deleted.","ok"); }catch(e){ msg("departmentMsg",e.message,"bad"); } }
-    async function loadAccounts(){ const rows=await api("/api/accounts"); accountRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.username)}</td><td>${esc(r.display_name)}</td><td>${esc(r.division)}</td><td>${esc(r.department)}</td><td>${esc(roleLabels[r.role]||r.role)}</td><td class="${r.is_active?'':'inactive'}">${r.is_active?'Active':'Inactive'}</td><td><button class="danger" onclick="deleteAccount(${r.id})">Delete</button></td></tr>`).join(""); }
-    async function createAccount(){ try{ if(!accountUsername.value.trim()) throw new Error("Enter username."); if(accountPassword.value.length<8) throw new Error("Password must be 8+ characters."); if(!accountName.value.trim()) throw new Error("Enter display name."); await api("/api/accounts",{method:"POST",body:JSON.stringify({username:accountUsername.value.trim(),password:accountPassword.value,display_name:accountName.value.trim(),division:accountDivision.value,department:accountDept.value,role:accountRole.value,is_active:accountRole.value!=="inactive"})}); await loadAccounts(); msg("accountMsg","Account saved.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
-    async function deleteAccount(id){ try{ await api(`/api/accounts/${id}`,{method:"DELETE"}); await loadAccounts(); msg("accountMsg","Account deleted.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
-    async function loadEmails(){ const rows=await api("/api/email-recipients"); emailRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteEmail(${r.id})">Delete</button></td></tr>`).join(""); }
-    async function loadEmailSettings(){ try{ const data=await api("/api/email-settings"); smtpHost.value=data.smtp_host||"smtp.gmail.com"; smtpPort.value=data.smtp_port||587; smtpUser.value=data.smtp_user||""; smtpPassword.placeholder=data.smtp_password_configured?"Configured - leave blank to keep":"Google app password"; alertEmail.value=data.alert_email||""; }catch(e){ msg("emailMsg",e.message,"bad"); } }
-    async function saveEmailSettings(){ try{ if(!smtpUser.value.trim()) throw new Error("Enter sender email."); if(!smtpPassword.value && smtpPassword.placeholder.indexOf("Configured") === -1) throw new Error("Enter app password."); await api("/api/email-settings",{method:"POST",body:JSON.stringify({smtp_host:smtpHost.value.trim()||"smtp.gmail.com",smtp_port:Number(smtpPort.value||587),smtp_user:smtpUser.value.trim(),smtp_password:smtpPassword.value,alert_email:alertEmail.value.trim()})}); smtpPassword.value=""; await loadEmailSettings(); msg("emailMsg","SMTP settings saved. Failed emails can now be resent.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
-    async function resendResultEmail(){ try{ if(!resendApplicationId.value) throw new Error("Enter application ID."); const data=await api(`/api/applications/${resendApplicationId.value}/resend-email`,{method:"POST"}); msg("emailMsg",`Email sent for #${data.id}. Status: ${data.email_status}`,"ok"); await loadStats(); }catch(e){ msg("emailMsg",e.message,"bad"); } }
-    async function createEmail(){ try{ if(!emailAddress.value.trim()) throw new Error("Enter email."); await api("/api/email-recipients",{method:"POST",body:JSON.stringify({email:emailAddress.value.trim(),name:emailName.value.trim()})}); emailAddress.value=""; emailName.value=""; await loadEmails(); msg("emailMsg","Email saved.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
-    async function deleteEmail(id){ try{ await api(`/api/email-recipients/${id}`,{method:"DELETE"}); await loadEmails(); msg("emailMsg","Email deleted.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    function fillDepartmentSelect(el, rows, fallback){ const options=rows.filter(r=>r.is_active).map(r=>`<option value="${esc(r.name)}">${esc(r.division ? r.division + ' / ' : '')}${esc(r.name)}</option>`).join(""); el.innerHTML=options||`<option value="">${esc(fallback)}</option>`; }
+    function renderDivisionRows(){ const el=document.getElementById("divisionRows"); if(!el) return; el.innerHTML=state.divisions.map(r=>`<tr><td>${r.id}</td><td><input id="divisionEdit${r.id}" value="${esc(r.name)}"></td><td><button class="ghost" onclick="updateDivision(${r.id})">수정</button> <button class="danger" onclick="deleteDivision(${r.id})">삭제</button></td></tr>`).join(""); }
+    async function loadDivisions(){ state.divisions=await api("/api/divisions"); fillSelect(accountDivision,state.divisions,"관리본부"); fillSelect(departmentDivision,state.divisions,"관리본부"); renderDivisionRows(); }
+    function departmentDivisionOptions(selected){ const rows=state.divisions.filter(r=>r.is_active); return `<option value="">미지정</option>${rows.map(r=>`<option value="${esc(r.name)}" ${r.name===selected?"selected":""}>${esc(r.name)}</option>`).join("")}`; }
+    async function loadDepartments(){ state.departments=await api("/api/departments"); fillDepartmentSelect(dept,state.departments,"선택 가능한 부서 없음"); fillDepartmentSelect(accountDept,state.departments,"선택 가능한 부서 없음"); departmentRows.innerHTML=state.departments.map(r=>`<tr><td>${r.id}</td><td><select onchange="updateDepartmentDivision(${r.id}, this.value)">${departmentDivisionOptions(r.division||"")}</select></td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteDepartment(${r.id})">삭제</button></td></tr>`).join(""); }
+    async function createDivision(){ await createDivisionValue(divisionName.value, "accountMsg", () => { divisionName.value=""; }); }
+    async function createDivisionFromManage(){ await createDivisionValue(divisionNameManage.value, "divisionMsg", () => { divisionNameManage.value=""; }); }
+    async function createDivisionValue(name, messageId, onSuccess){ try{ const value=name.trim(); if(!value) throw new Error("본부명을 입력하세요."); await api("/api/divisions",{method:"POST",body:JSON.stringify({name:value})}); if(onSuccess) onSuccess(); await loadDivisions(); await loadDepartments(); if(document.getElementById("accountRows")) await loadAccounts(); msg(messageId,"본부가 저장되었습니다.","ok"); }catch(e){ msg(messageId,e.message,"bad"); } }
+    async function updateDivision(id){ try{ const input=document.getElementById(`divisionEdit${id}`); const name=input.value.trim(); if(!name) throw new Error("본부명을 입력하세요."); await api(`/api/divisions/${id}`,{method:"PUT",body:JSON.stringify({name})}); await loadDivisions(); await loadDepartments(); if(document.getElementById("accountRows")) await loadAccounts(); msg("divisionMsg","본부가 수정되었습니다.","ok"); }catch(e){ msg("divisionMsg",e.message,"bad"); } }
+    async function deleteDivision(id){ try{ if(!confirm("본부를 삭제하면 해당 본부로 연결된 부서와 계정의 본부 설정이 미지정으로 변경됩니다. 삭제할까요?")) return; await api(`/api/divisions/${id}`,{method:"DELETE"}); await loadDivisions(); await loadDepartments(); if(document.getElementById("accountRows")) await loadAccounts(); msg("divisionMsg","본부가 삭제되었습니다.","ok"); }catch(e){ msg("divisionMsg",e.message,"bad"); } }
+    async function createDepartmentInline(){ departmentName.value=departmentNameInline.value; if(departmentDivision && accountDivision.value) departmentDivision.value=accountDivision.value; await createDepartment("accountMsg"); departmentNameInline.value=""; }
+    async function createDepartment(messageId="departmentMsg"){ try{ if(!departmentName.value.trim()) throw new Error("부서명을 입력하세요."); await api("/api/departments",{method:"POST",body:JSON.stringify({division:departmentDivision.value,name:departmentName.value.trim()})}); departmentName.value=""; await loadDepartments(); msg(messageId,"부서가 저장되었습니다.","ok"); }catch(e){ msg(messageId,e.message,"bad"); } }
+    async function updateDepartmentDivision(id, division){ try{ await api(`/api/departments/${id}`,{method:"PUT",body:JSON.stringify({division})}); await loadDepartments(); msg("departmentMsg","본부 설정이 저장되었습니다.","ok"); }catch(e){ msg("departmentMsg",e.message,"bad"); } }
+    async function deleteDepartment(id){ try{ await api(`/api/departments/${id}`,{method:"DELETE"}); await loadDepartments(); msg("departmentMsg","부서가 삭제되었습니다.","ok"); }catch(e){ msg("departmentMsg",e.message,"bad"); } }
+    async function loadAccounts(){ const rows=await api("/api/accounts"); accountRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.username)}</td><td>${esc(r.display_name)}</td><td>${esc(r.division)}</td><td>${esc(r.department)}</td><td>${esc(roleLabels[r.role]||r.role)}</td><td class="${r.is_active?'':'inactive'}">${r.is_active?'활성':'비활성'}</td><td><button class="ghost" onclick="toggleAccount(${r.id}, ${r.is_active?0:1})">${r.is_active?'비활성화':'활성화'}</button> <button class="danger" onclick="deleteAccount(${r.id})">삭제</button></td></tr>`).join(""); }
+    async function createAccount(){ try{ if(!accountUsername.value.trim()) throw new Error("아이디를 입력하세요."); if(accountPassword.value.length<8) throw new Error("비밀번호는 8자 이상이어야 합니다."); if(!accountName.value.trim()) throw new Error("표시 이름을 입력하세요."); await api("/api/accounts",{method:"POST",body:JSON.stringify({username:accountUsername.value.trim(),password:accountPassword.value,display_name:accountName.value.trim(),division:accountDivision.value,department:accountDept.value,role:accountRole.value,is_active:accountRole.value!=="inactive"})}); await loadAccounts(); msg("accountMsg","계정이 저장되었습니다.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
+    async function toggleAccount(id, active){ try{ await api(`/api/accounts/${id}`,{method:"PATCH",body:JSON.stringify({is_active:Boolean(active)})}); await loadAccounts(); await loadPasswordTargets(); msg("accountMsg",active?"계정이 활성화되었습니다.":"계정이 비활성화되었습니다.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
+    async function deleteAccount(id){ try{ await api(`/api/accounts/${id}`,{method:"DELETE"}); await loadAccounts(); msg("accountMsg","계정이 삭제되었습니다.","ok"); }catch(e){ msg("accountMsg",e.message,"bad"); } }
+    async function loadPasswordTargets(){ const rows=await api("/api/password-targets"); passwordAccount.innerHTML=rows.map(r=>`<option value="${r.id}">${r.id} / ${esc(r.username)} / ${esc(r.display_name)}${r.is_active?'':' / 비활성'}</option>`).join(""); }
+    function passwordError(password){ if(password.length<8) return "비밀번호는 8자 이상이어야 합니다."; if(!/[A-Z]/.test(password)) return "영문 대문자를 포함해야 합니다."; if(!/[a-z]/.test(password)) return "영문 소문자를 포함해야 합니다."; if(!/[0-9]/.test(password)) return "숫자를 포함해야 합니다."; if(!/[^A-Za-z0-9]/.test(password)) return "특수문자를 포함해야 합니다."; return ""; }
+    async function changePassword(){ try{ if(!passwordAccount.value) throw new Error("변경 대상 계정을 선택하세요."); const err=passwordError(newPassword.value); if(err) throw new Error(err); if(newPassword.value!==confirmPassword.value) throw new Error("새 비밀번호와 재확인 비밀번호가 일치하지 않습니다."); await api(`/api/accounts/${passwordAccount.value}/password`,{method:"POST",body:JSON.stringify({current_password:currentPassword.value,new_password:newPassword.value,confirm_password:confirmPassword.value})}); currentPassword.value=""; newPassword.value=""; confirmPassword.value=""; msg("passwordMsg","비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요.","ok"); }catch(e){ msg("passwordMsg",e.message,"bad"); } }
+    async function loadEmails(){ const rows=await api("/api/email-recipients"); emailRows.innerHTML=rows.map(r=>`<tr><td>${r.id}</td><td>${esc(r.email)}</td><td>${esc(r.name)}</td><td><button class="danger" onclick="deleteEmail(${r.id})">삭제</button></td></tr>`).join(""); }
+    async function loadEmailSettings(){ try{ const data=await api("/api/email-settings"); smtpHost.value=data.smtp_host||"smtp.gmail.com"; smtpPort.value=data.smtp_port||587; smtpUser.value=data.smtp_user||""; smtpPassword.placeholder=data.smtp_password_configured?"설정됨 - 기존 비밀번호 유지 시 빈칸":"Google 앱 비밀번호"; alertEmail.value=data.alert_email||""; }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function saveEmailSettings(){ try{ if(!smtpUser.value.trim()) throw new Error("발신 이메일을 입력하세요."); if(!smtpPassword.value && smtpPassword.placeholder.indexOf("설정됨") === -1) throw new Error("앱 비밀번호를 입력하세요."); await api("/api/email-settings",{method:"POST",body:JSON.stringify({smtp_host:smtpHost.value.trim()||"smtp.gmail.com",smtp_port:Number(smtpPort.value||587),smtp_user:smtpUser.value.trim(),smtp_password:smtpPassword.value,alert_email:alertEmail.value.trim()})}); smtpPassword.value=""; await loadEmailSettings(); msg("emailMsg","SMTP 설정이 저장되었습니다. 실패한 이메일을 재발송할 수 있습니다.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function resendResultEmail(){ try{ if(!resendApplicationId.value) throw new Error("신청 ID를 입력하세요."); const data=await api(`/api/applications/${resendApplicationId.value}/resend-email`,{method:"POST"}); msg("emailMsg",`#${data.id} 이메일이 발송되었습니다. 상태: ${statusLabels[data.email_status]||data.email_status}`,"ok"); await loadStats(); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function createEmail(){ try{ if(!emailAddress.value.trim()) throw new Error("이메일을 입력하세요."); await api("/api/email-recipients",{method:"POST",body:JSON.stringify({email:emailAddress.value.trim(),name:emailName.value.trim()})}); emailAddress.value=""; emailName.value=""; await loadEmails(); msg("emailMsg","이메일이 저장되었습니다.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
+    async function deleteEmail(id){ try{ await api(`/api/email-recipients/${id}`,{method:"DELETE"}); await loadEmails(); msg("emailMsg","이메일이 삭제되었습니다.","ok"); }catch(e){ msg("emailMsg",e.message,"bad"); } }
     carNumber.addEventListener("input", clearSelectedEntry);
     entryTime.addEventListener("change", clearSelectedEntry);
     if(state.token) enterApp().catch(()=>logout());

@@ -33,11 +33,26 @@ class AccountUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128)
+    confirm_password: str = Field(min_length=1, max_length=128)
+
+
 class DepartmentCreate(BaseModel):
+    division: str = Field(default="", max_length=80)
     name: str = Field(min_length=1, max_length=80)
 
 
+class DepartmentUpdate(BaseModel):
+    division: str = Field(default="", max_length=80)
+
+
 class DivisionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class DivisionUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
 
 

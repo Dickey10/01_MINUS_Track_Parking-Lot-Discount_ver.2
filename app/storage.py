@@ -66,6 +66,7 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS departments (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
+              division TEXT NOT NULL DEFAULT '',
               name TEXT NOT NULL UNIQUE,
               is_active INTEGER NOT NULL DEFAULT 1,
               created_at TEXT NOT NULL
@@ -118,6 +119,7 @@ def init_db() -> None:
             """
         )
         _migrate_accounts(conn)
+        _ensure_column(conn, "departments", "division", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(conn, "parking_applications", "division", "TEXT NOT NULL DEFAULT ''")
         _ensure_column(conn, "parking_applications", "ats_entry_id", "TEXT NOT NULL DEFAULT ''")
         admin = conn.execute(
@@ -135,11 +137,16 @@ def init_db() -> None:
                     settings.admin_username,
                     hash_password(settings.admin_password),
                     "System Admin",
-                    "Management Division",
+                    "admin",
                     "General Affairs",
                     now,
                     now,
                 ),
+            )
+        else:
+            conn.execute(
+                "UPDATE accounts SET division = 'admin', role = 'super_admin', is_active = 1 WHERE username = ?",
+                (settings.admin_username,),
             )
 
 

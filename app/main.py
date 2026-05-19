@@ -16,12 +16,15 @@ from app.models import (
     AccountUpdate,
     ATSDiscountDeleteRequest,
     DepartmentCreate,
+    DepartmentUpdate,
     DivisionCreate,
+    DivisionUpdate,
     EmailRecipientCreate,
     EmailSettingsUpdate,
     LoginRequest,
     ManualApplyRequest,
     ParkingApplicationCreate,
+    PasswordChangeRequest,
     RegisterRequest,
     RegisterResponse,
 )
@@ -58,6 +61,32 @@ async def startup() -> None:
 
 def _is_admin(user: dict) -> bool:
     return user["role"] in ("super_admin", "admin")
+
+
+def _has_all_scope(user: dict) -> bool:
+    return _is_admin(user) or user.get("division") == "admin"
+
+
+def _password_error(password: str) -> str:
+    if len(password) < 8:
+        return "비밀번호는 8자 이상이어야 합니다."
+    if not any(ch.isupper() for ch in password):
+        return "비밀번호에는 영문 대문자가 포함되어야 합니다."
+    if not any(ch.islower() for ch in password):
+        return "비밀번호에는 영문 소문자가 포함되어야 합니다."
+    if not any(ch.isdigit() for ch in password):
+        return "비밀번호에는 숫자가 포함되어야 합니다."
+    if not any(not ch.isalnum() for ch in password):
+        return "비밀번호에는 특수문자가 포함되어야 합니다."
+    return ""
+
+
+def _can_manage_account(user: dict, target: dict) -> bool:
+    if target["id"] == user["id"]:
+        return True
+    if _has_all_scope(user):
+        return True
+    return user["role"] == "division_admin" and target.get("division", "") == user.get("division", "")
 
 
 def get_current_user(authorization: Annotated[str, Header()] = "") -> dict:
@@ -106,6 +135,12 @@ def get_application(application_id: int) -> dict:
     if not app_row:
         raise HTTPException(status_code=404, detail="Application not found")
     return app_row
+
+
+def department_division(name: str) -> str:
+    with connect() as conn:
+        row = row_to_dict(conn.execute("SELECT division FROM departments WHERE name = ?", (name,)).fetchone())
+    return row["division"] if row else ""
 
 
 def update_email_status(application_id: int, sent: bool) -> None:
@@ -165,6 +200,7 @@ async def login(req: LoginRequest):
     token = create_token({"sub": row["id"], "role": row["role"]})
     return {
         "token": token,
+        "expires_in": 600,
         "user": {
             "id": row["id"],
             "username": row["username"],
@@ -188,15 +224,46 @@ async def list_accounts(_: dict = Depends(require_admin)):
             """
             SELECT id, username, display_name, division, department, role, is_active, created_at, updated_at
             FROM accounts
-            ORDER BY id
+            ORDER BY id ASC
             """
         ).fetchall()
+    return rows_to_dicts(rows)
+
+
+@app.get("/api/password-targets")
+async def password_targets(user: dict = Depends(get_current_user)):
+    with connect() as conn:
+        if _has_all_scope(user):
+            rows = conn.execute(
+                "SELECT id, username, display_name, division, department, role, is_active FROM accounts ORDER BY id ASC"
+            ).fetchall()
+        elif user["role"] == "division_admin":
+            rows = conn.execute(
+                """
+                SELECT id, username, display_name, division, department, role, is_active
+                FROM accounts
+                WHERE id = ? OR division = ?
+                ORDER BY id ASC
+                """,
+                (user["id"], user.get("division", "")),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, username, display_name, division, department, role, is_active
+                FROM accounts
+                WHERE id = ?
+                ORDER BY id ASC
+                """,
+                (user["id"],),
+            ).fetchall()
     return rows_to_dicts(rows)
 
 
 @app.post("/api/accounts")
 async def create_account(req: AccountCreate, user: dict = Depends(require_admin)):
     now = utc_now()
+    division = "admin" if req.role in ("super_admin", "admin") else req.division
     try:
         with connect() as conn:
             existing = row_to_dict(
@@ -213,7 +280,7 @@ async def create_account(req: AccountCreate, user: dict = Depends(require_admin)
                     (
                         hash_password(req.password),
                         req.display_name,
-                        req.division,
+                        division,
                         req.department,
                         req.role,
                         0 if req.role == "inactive" else 1,
@@ -235,7 +302,7 @@ async def create_account(req: AccountCreate, user: dict = Depends(require_admin)
                         req.username,
                         hash_password(req.password),
                         req.display_name,
-                        req.division,
+                        division,
                         req.department,
                         req.role,
                         0 if req.role == "inactive" else (1 if req.is_active else 0),
@@ -256,11 +323,19 @@ async def update_account(account_id: int, req: AccountUpdate, user: dict = Depen
         existing = row_to_dict(conn.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone())
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found")
+    if account_id == user["id"] and req.is_active is False:
+        raise HTTPException(status_code=400, detail="자기 계정은 비활성화할 수 없습니다.")
 
     role = req.role if req.role is not None else existing["role"]
+    division = req.division if req.division is not None else existing.get("division", "")
+    if role in ("super_admin", "admin"):
+        division = "admin"
     is_active = int(req.is_active) if req.is_active is not None else existing["is_active"]
     if role == "inactive":
         is_active = 0
+    elif req.is_active is True and existing["role"] == "inactive" and req.role is None:
+        role = "user"
+        is_active = 1
     elif req.role is not None and req.is_active is None:
         is_active = 1
 
@@ -273,7 +348,7 @@ async def update_account(account_id: int, req: AccountUpdate, user: dict = Depen
             """,
             (
                 req.display_name if req.display_name is not None else existing["display_name"],
-                req.division if req.division is not None else existing.get("division", ""),
+                division,
                 req.department if req.department is not None else existing["department"],
                 role,
                 is_active,
@@ -283,6 +358,35 @@ async def update_account(account_id: int, req: AccountUpdate, user: dict = Depen
             ),
         )
     audit(user["id"], "update", "account", account_id, existing["username"])
+    return {"ok": True}
+
+
+@app.post("/api/accounts/{account_id}/password")
+async def change_account_password(account_id: int, req: PasswordChangeRequest, user: dict = Depends(get_current_user)):
+    if req.new_password != req.confirm_password:
+        raise HTTPException(status_code=400, detail="새 비밀번호와 재확인 비밀번호가 일치하지 않습니다.")
+    password_error = _password_error(req.new_password)
+    if password_error:
+        raise HTTPException(status_code=400, detail=password_error)
+    with connect() as conn:
+        actor = row_to_dict(conn.execute("SELECT id, password_hash FROM accounts WHERE id = ?", (user["id"],)).fetchone())
+        target = row_to_dict(
+            conn.execute(
+                "SELECT id, username, division, role, is_active FROM accounts WHERE id = ?",
+                (account_id,),
+            ).fetchone()
+        )
+        if not actor or not verify_password(req.current_password, actor["password_hash"]):
+            raise HTTPException(status_code=401, detail="현재 비밀번호가 일치하지 않습니다.")
+        if not target:
+            raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
+        if not _can_manage_account(user, target):
+            raise HTTPException(status_code=403, detail="해당 계정의 비밀번호를 변경할 권한이 없습니다.")
+        conn.execute(
+            "UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?",
+            (hash_password(req.new_password), utc_now(), account_id),
+        )
+    audit(user["id"], "change_password", "account", account_id, target["username"])
     return {"ok": True}
 
 
@@ -299,7 +403,7 @@ async def delete_account(account_id: int, user: dict = Depends(require_admin)):
 @app.get("/api/divisions")
 async def list_divisions(_: dict = Depends(get_current_user)):
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM divisions ORDER BY name").fetchall()
+        rows = conn.execute("SELECT * FROM divisions ORDER BY id ASC").fetchall()
     return rows_to_dicts(rows)
 
 
@@ -324,33 +428,72 @@ async def create_division(req: DivisionCreate, user: dict = Depends(require_admi
 @app.delete("/api/divisions/{division_id}")
 async def delete_division(division_id: int, user: dict = Depends(require_admin)):
     with connect() as conn:
+        existing = row_to_dict(conn.execute("SELECT id, name FROM divisions WHERE id = ?", (division_id,)).fetchone())
+        if not existing:
+            raise HTTPException(status_code=404, detail="본부를 찾을 수 없습니다.")
         conn.execute("DELETE FROM divisions WHERE id = ?", (division_id,))
+        conn.execute("UPDATE departments SET division = '' WHERE division = ?", (existing["name"],))
+        conn.execute("UPDATE accounts SET division = '' WHERE division = ?", (existing["name"],))
     audit(user["id"], "delete", "division", division_id)
     return {"ok": True}
 
 
-@app.get("/api/departments")
-async def list_departments(_: dict = Depends(get_current_user)):
+@app.put("/api/divisions/{division_id}")
+async def update_division(division_id: int, req: DivisionUpdate, user: dict = Depends(require_admin)):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="본부명을 입력하세요.")
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM departments ORDER BY name").fetchall()
+        existing = row_to_dict(conn.execute("SELECT id, name FROM divisions WHERE id = ?", (division_id,)).fetchone())
+        if not existing:
+            raise HTTPException(status_code=404, detail="본부를 찾을 수 없습니다.")
+        duplicate = row_to_dict(
+            conn.execute("SELECT id FROM divisions WHERE name = ? AND id <> ?", (name, division_id)).fetchone()
+        )
+        if duplicate:
+            raise HTTPException(status_code=400, detail="이미 등록된 본부명입니다.")
+        old_name = existing["name"]
+        conn.execute("UPDATE divisions SET name = ? WHERE id = ?", (name, division_id))
+        conn.execute("UPDATE departments SET division = ? WHERE division = ?", (name, old_name))
+        conn.execute("UPDATE accounts SET division = ? WHERE division = ?", (name, old_name))
+    audit(user["id"], "update", "division", division_id, f"{old_name} -> {name}")
+    return {"ok": True}
+
+
+@app.get("/api/departments")
+async def list_departments(user: dict = Depends(get_current_user)):
+    with connect() as conn:
+        if _has_all_scope(user):
+            rows = conn.execute("SELECT * FROM departments ORDER BY id ASC").fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM departments WHERE division = ? ORDER BY id ASC",
+                (user.get("division", ""),),
+            ).fetchall()
     return rows_to_dicts(rows)
 
 
 @app.post("/api/departments")
 async def create_department(req: DepartmentCreate, user: dict = Depends(require_admin)):
+    division = req.division.strip()
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="부서명을 입력하세요.")
     with connect() as conn:
         existing = row_to_dict(conn.execute("SELECT id FROM departments WHERE name = ?", (name,)).fetchone())
         if existing:
+            if division:
+                conn.execute(
+                    "UPDATE departments SET division = ? WHERE id = ?",
+                    (division, existing["id"]),
+                )
             return {"id": existing["id"], "ok": True, "existing": True}
         cur = conn.execute(
-            "INSERT INTO departments (name, is_active, created_at) VALUES (?, 1, ?)",
-            (name, utc_now()),
+            "INSERT INTO departments (division, name, is_active, created_at) VALUES (?, ?, 1, ?)",
+            (division, name, utc_now()),
         )
         department_id = cur.lastrowid
-    audit(user["id"], "create", "department", department_id, name)
+    audit(user["id"], "create", "department", department_id, f"{division}/{name}")
     return {"id": department_id}
 
 
@@ -362,10 +505,22 @@ async def delete_department(department_id: int, user: dict = Depends(require_adm
     return {"ok": True}
 
 
+@app.put("/api/departments/{department_id}")
+async def update_department(department_id: int, req: DepartmentUpdate, user: dict = Depends(require_admin)):
+    division = req.division.strip()
+    with connect() as conn:
+        existing = row_to_dict(conn.execute("SELECT id, name FROM departments WHERE id = ?", (department_id,)).fetchone())
+        if not existing:
+            raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
+        conn.execute("UPDATE departments SET division = ? WHERE id = ?", (division, department_id))
+    audit(user["id"], "update", "department", department_id, f"{division}/{existing['name']}")
+    return {"ok": True}
+
+
 @app.get("/api/email-recipients")
 async def list_email_recipients(_: dict = Depends(require_admin)):
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM email_recipients ORDER BY email").fetchall()
+        rows = conn.execute("SELECT * FROM email_recipients ORDER BY id ASC").fetchall()
     return rows_to_dicts(rows)
 
 
@@ -412,10 +567,20 @@ async def email_settings(_: dict = Depends(require_admin)):
 
 @app.post("/api/email-settings")
 async def save_email_settings(req: EmailSettingsUpdate, user: dict = Depends(require_admin)):
+    smtp_user = req.smtp_user.strip()
+    password_required = bool(smtp_user) and (
+        not settings.smtp_password or smtp_user != settings.smtp_user
+    )
+    if password_required and not req.smtp_password.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Enter the SMTP app password when configuring a new sender email.",
+        )
+
     values = {
         "SMTP_HOST": req.smtp_host.strip() or "smtp.gmail.com",
         "SMTP_PORT": str(req.smtp_port),
-        "SMTP_USER": req.smtp_user.strip(),
+        "SMTP_USER": smtp_user,
         "ALERT_EMAIL": req.alert_email.strip(),
     }
     if req.smtp_password:
@@ -438,6 +603,9 @@ async def create_application(req: ParkingApplicationCreate, user: dict = Depends
     entry_time = req.entry_time or datetime.now()
     plan = calculate_discount_plan(entry_time)
     now = utc_now()
+    division = department_division(req.dept) or user.get("division", "")
+    if not _has_all_scope(user) and division != user.get("division", ""):
+        raise HTTPException(status_code=403, detail="같은 본부의 부서만 선택할 수 있습니다.")
 
     with connect() as conn:
         cur = conn.execute(
@@ -452,7 +620,7 @@ async def create_application(req: ParkingApplicationCreate, user: dict = Depends
                 req.car_number,
                 entry_time.isoformat(timespec="seconds"),
                 req.ats_entry_id.strip(),
-                user.get("division", ""),
+                division,
                 req.dept,
                 req.requester,
                 req.visitor_company,
@@ -604,13 +772,15 @@ async def list_applications(
     }
     if status:
         filters["status"] = status
+    if not _has_all_scope(user):
+        filters["division"] = user.get("division", "")
     where, values = _filter_conditions(filters)
     if not status:
         clause = "status IN ('pending', 'succeeded')"
         where = f"{where} AND {clause}" if where else f"WHERE {clause}"
     with connect() as conn:
         rows = conn.execute(
-            f"SELECT * FROM parking_applications {where} ORDER BY id DESC LIMIT 500",
+            f"SELECT * FROM parking_applications {where} ORDER BY id ASC LIMIT 500",
             values,
         ).fetchall()
     return rows_to_dicts(rows)

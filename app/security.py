@@ -31,7 +31,7 @@ def _secret() -> bytes:
     return raw.encode()
 
 
-def create_token(payload: dict[str, Any], ttl_seconds: int = 60 * 60 * 12) -> str:
+def create_token(payload: dict[str, Any], ttl_seconds: int = 60 * 10) -> str:
     body = dict(payload)
     body["exp"] = int(time.time()) + ttl_seconds
     raw = json.dumps(body, separators=(",", ":"), ensure_ascii=True).encode()
@@ -53,4 +53,3 @@ def decode_token(token: str) -> dict[str, Any] | None:
         return payload
     except Exception:
         return None
-

@@ -117,6 +117,36 @@ https://random-words.trycloudflare.com
 It does not require domain ownership, but the URL changes whenever the tunnel
 restarts. This is useful for demos, not production.
 
+## Daily 9:00 AM Publish Check
+
+Use this when the PC should verify the local app and tunnel every day at
+9:00 AM, but only while Windows is on at that time.
+
+Install the daily scheduled task:
+
+```powershell
+.\scripts\install_daily_publish_task.ps1 -ExpectedPublicUrl "https://favors-russia-easily-artistic.trycloudflare.com"
+```
+
+The check script:
+
+- starts the local FastAPI server if it is not already healthy
+- starts the Cloudflare tunnel process
+- confirms `http://127.0.0.1:8000/api/health`
+- reads the latest quick tunnel URL from `data/cloudflared.err.log`
+- writes status to `data/daily_publish_check.log`
+- sends an alert email when SMTP and `ALERT_EMAIL` are configured correctly
+
+Important limitation:
+
+- `https://*.trycloudflare.com` quick tunnel URLs are temporary and rotate after
+  restart
+- a fixed public URL requires a named Cloudflare Tunnel with
+  `CLOUDFLARE_TUNNEL_TOKEN` configured in `.env`
+- if the expected `trycloudflare.com` URL no longer matches the newest quick
+  tunnel URL, the daily check raises an alert instead of pretending deployment
+  succeeded
+
 ## Option B-2: Same Wi-Fi or Office LAN by IP Address
 
 This works only when users are on the same office network or VPN.
