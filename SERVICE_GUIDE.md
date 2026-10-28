@@ -104,6 +104,10 @@ The documented Windows and Docker origins use HTTP on a private local/Compose ne
 
 If the Tunnel dashboard instead points to an `https://` origin, check that the certificate hostname matches the configured origin hostname and that the certificate chain is trusted. For diagnosis, inspect Tunnel logs for `x509: certificate is valid for ... not ...` (hostname mismatch) or `x509: certificate signed by unknown authority` (CA trust issue). Fix the hostname or CA chain; do not leave origin TLS verification disabled.
 
+## Legacy API key endpoint
+
+The old `POST /register` endpoint is disabled when `API_KEY` is blank. The current app uses authenticated `/api/*` routes. Do not put `API_KEY` in browser JavaScript; anything sent by a browser is visible to users.
+
 ## Data and log cleanup
 
 The automatic cleanup is limited to log rotation. Keep `data\parking_app.db` (application and audit history), `data\storage_state.json` (ATS login session), and screenshots until the owner-approved retention period is defined. They can contain operational evidence or credentials; do not delete them as part of a routine memory cleanup.
