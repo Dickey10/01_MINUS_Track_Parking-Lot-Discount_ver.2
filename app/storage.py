@@ -126,6 +126,8 @@ def init_db() -> None:
             "SELECT id FROM accounts WHERE username = ?", (settings.admin_username,)
         ).fetchone()
         if not admin:
+            if len(settings.admin_password) < 24 or settings.admin_password in {"admin1234", "replace-before-first-use"}:
+                raise RuntimeError("Set ADMIN_PASSWORD to a unique password of at least 24 characters before the first startup.")
             now = utc_now()
             conn.execute(
                 """
