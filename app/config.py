@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     secret_key: str = ""
     admin_username: str = "admin"
     admin_password: str = "admin1234"
-    cors_origins: str = "*"
+    cors_origins: str = ""
 
     class Config:
         env_file = ".env"
