@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -227,36 +228,6 @@ async def list_accounts(_: dict = Depends(require_admin)):
             ORDER BY id ASC
             """
         ).fetchall()
-    return rows_to_dicts(rows)
-
-
-@app.get("/api/password-targets")
-async def password_targets(user: dict = Depends(get_current_user)):
-    with connect() as conn:
-        if _has_all_scope(user):
-            rows = conn.execute(
-                "SELECT id, username, display_name, division, department, role, is_active FROM accounts ORDER BY id ASC"
-            ).fetchall()
-        elif user["role"] == "division_admin":
-            rows = conn.execute(
-                """
-                SELECT id, username, display_name, division, department, role, is_active
-                FROM accounts
-                WHERE id = ? OR division = ?
-                ORDER BY id ASC
-                """,
-                (user["id"], user.get("division", "")),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT id, username, display_name, division, department, role, is_active
-                FROM accounts
-                WHERE id = ?
-                ORDER BY id ASC
-                """,
-                (user["id"],),
-            ).fetchall()
     return rows_to_dicts(rows)
 
 
@@ -841,7 +812,9 @@ async def delete_ats_discount(req: ATSDiscountDeleteRequest, user: dict = Depend
 
 @app.post("/register", response_model=RegisterResponse)
 async def legacy_register(req: RegisterRequest, x_api_key: Annotated[str, Header()] = ""):
-    if settings.api_key and x_api_key != settings.api_key:
+    if not settings.api_key:
+        raise HTTPException(status_code=503, detail="Legacy registration endpoint is disabled.")
+    if not hmac.compare_digest(x_api_key, settings.api_key):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     async with _ats_lock:
         return await registrar.run(req)
