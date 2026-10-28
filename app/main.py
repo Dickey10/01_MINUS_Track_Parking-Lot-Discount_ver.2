@@ -57,6 +57,8 @@ async def unhandled_exception_handler(_, exc: Exception):
 
 @app.on_event("startup")
 async def startup() -> None:
+    if len(settings.secret_key.strip()) < 32 or settings.secret_key == "replace-with-a-long-random-secret":
+        raise RuntimeError("Set SECRET_KEY to a unique random value of at least 32 characters before starting the app.")
     init_db()
 
 
