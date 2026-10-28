@@ -1,193 +1,125 @@
-# Running the ATS Parking App Without Keeping PowerShell Open
+# Running the ATS Parking App
 
-You do not need to keep a PowerShell window open.
+## Option A: Start the app at Windows login
 
-## Option A: Windows Startup Task
-
-Use this when the app should run on this PC after Windows login.
-
-Run PowerShell once:
+Use this on a local PC. Install the runtime and register the app task:
 
 ```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 .\scripts\setup_runtime.ps1
 .\scripts\install_startup_task.ps1
 ```
 
-After that, the app starts automatically at login:
-
-```text
-http://127.0.0.1:8000
-```
-
-Logs:
-
-```text
-data/server.log
-```
-
-If ATS automatic registration shows a Playwright browser error such as
-`Executable doesn't exist`, run:
+The app should answer at `http://127.0.0.1:8000`. Check it with:
 
 ```powershell
-.\scripts\setup_runtime.ps1
+Invoke-RestMethod http://127.0.0.1:8000/api/health
 ```
 
-That command installs both Python packages and the Chromium browser used for ATS
-automation.
+Logs are written under `data\`. The server and Tunnel start scripts rotate their active log when it reaches 10 MB and keep one prior copy.
 
-Remove the startup task:
+## Option B: Windows app with a named Cloudflare Tunnel
+
+This is the documented employee access path. The app and `cloudflared.exe` run on the same Windows PC, and the Tunnel origin should point to `http://127.0.0.1:8000`.
+
+### Move the Tunnel token out of .env
+
+Run this once. It migrates `CLOUDFLARE_TUNNEL_TOKEN` from `.env` into an ignored, current-user-only file at `secrets\cloudflared-token`. If the token is not in `.env`, the script prompts for it without echoing the input.
 
 ```powershell
-.\scripts\uninstall_startup_task.ps1
+.\scripts\migrate_cloudflare_tunnel_token.ps1
 ```
 
-## Option B: Local PC + Cloudflare Tunnel
+Do not commit or copy the `secrets\` directory. The startup task now reads the token with `--token-file`, so it does not appear as a command-line argument.
 
-Use this when other employees need to access the app through a web URL while the
-app still runs on this PC.
+### Check and update cloudflared
 
-1. Install or place `cloudflared.exe` at:
-
-```text
-C:\Users\HOME\Downloads\cloudflared\cloudflared.exe
-```
-
-2. In Cloudflare Zero Trust, create a tunnel and route a hostname to:
-
-```text
-http://127.0.0.1:8000
-```
-
-3. Copy the tunnel token into `.env`:
-
-```text
-CLOUDFLARE_TUNNEL_TOKEN=your-cloudflare-token
-```
-
-4. Install both startup tasks:
+Check the executable used by the task. By default it is `%USERPROFILE%\Downloads\cloudflared\cloudflared.exe`; set `CLOUDFLARED_PATH` if yours is elsewhere.
 
 ```powershell
-.\scripts\setup_runtime.ps1
-.\scripts\install_all_startup_tasks.ps1
+$cloudflared = Join-Path $env:USERPROFILE "Downloads\cloudflared\cloudflared.exe"
+& $cloudflared --version
 ```
 
-If Windows blocks Task Scheduler registration, use the current-user Startup
-folder instead:
+The startup script refuses versions older than `2026.10.2`. Stage the official Windows 64-bit release `2026.10.5`; the updater verifies its SHA-256 checksum before accepting it:
 
 ```powershell
-.\scripts\install_user_startup_shortcuts.ps1
+.\scripts\update_cloudflared.ps1
 ```
 
-After the next Windows login, both the app server and the tunnel start
-automatically.
+Before replacing the running connector, add a temporary replica for the same Tunnel in Cloudflare Zero Trust. Confirm it is healthy and can reach the same origin. If the origin is only reachable on this PC, arrange a replica host that can reach it or use a maintenance window; a replica that cannot reach the origin does not protect the app.
 
-Logs:
-
-```text
-data/server.log
-data/cloudflared.log
-data/cloudflared.err.log
-```
-
-Show the current local and temporary Cloudflare demo URLs:
+Stop the scheduled task or close the existing Tunnel process, then apply the staged executable:
 
 ```powershell
-.\scripts\show_demo_urls.ps1
+Stop-ScheduledTask -TaskName "ATS Parking Cloudflare Tunnel"
+.\scripts\update_cloudflared.ps1 -Apply
+& $cloudflared --version
+Start-ScheduledTask -TaskName "ATS Parking Cloudflare Tunnel"
 ```
 
-Remove the Startup folder shortcuts:
-
-```powershell
-.\scripts\uninstall_user_startup_shortcuts.ps1
-```
-
-For a temporary test URL without a token:
+If you use the Startup folder shortcut instead of Task Scheduler, stop that Tunnel process after confirming the replica is healthy, then run the apply command and start the Tunnel again with:
 
 ```powershell
 .\scripts\start_cloudflare_tunnel.ps1
 ```
 
-The temporary URL looks like:
+Verify the Tunnel is Healthy in the dashboard, check `data\cloudflared.err.log` for errors, and test the public app URL and a test registration. Keep the previous executable backup until the checks pass. If the new connector fails, stop it, restore the `.bak` executable over `cloudflared.exe`, and restart the Tunnel.
 
-```text
-https://random-words.trycloudflare.com
-```
+Remove the temporary replica after the updated connector is healthy. If the app is confirmed to use only one connector and a replica cannot be made to reach the origin, update during a maintenance window and expect a brief registration API interruption while the Tunnel reconnects.
 
-It does not require domain ownership, but the URL changes whenever the tunnel
-restarts. This is useful for demos, not production.
+### Temporary demonstration tunnel
 
-## Daily 9:00 AM Publish Check
-
-Use this when the PC should verify the local app and tunnel every day at
-9:00 AM, but only while Windows is on at that time.
-
-Install the daily scheduled task:
+A Quick Tunnel has a changing public URL and is for demonstrations only. Start it explicitly:
 
 ```powershell
-.\scripts\install_daily_publish_task.ps1 -ExpectedPublicUrl "https://favors-russia-easily-artistic.trycloudflare.com"
+.\scripts\start_cloudflare_tunnel.ps1 -Quick
 ```
 
-The check script:
-
-- starts the local FastAPI server if it is not already healthy
-- starts the Cloudflare tunnel process
-- confirms `http://127.0.0.1:8000/api/health`
-- reads the latest quick tunnel URL from `data/cloudflared.err.log`
-- writes status to `data/daily_publish_check.log`
-- sends an alert email when SMTP and `ALERT_EMAIL` are configured correctly
-
-Important limitation:
-
-- `https://*.trycloudflare.com` quick tunnel URLs are temporary and rotate after
-  restart
-- a fixed public URL requires a named Cloudflare Tunnel with
-  `CLOUDFLARE_TUNNEL_TOKEN` configured in `.env`
-- if the expected `trycloudflare.com` URL no longer matches the newest quick
-  tunnel URL, the daily check raises an alert instead of pretending deployment
-  succeeded
-
-## Option B-2: Same Wi-Fi or Office LAN by IP Address
-
-This works only when users are on the same office network or VPN.
-
-1. Change `.env`:
-
-```text
-APP_HOST=0.0.0.0
-APP_PORT=8000
-```
-
-2. Restart the app.
-
-3. Find this PC's IPv4 address:
-
-```powershell
-ipconfig
-```
-
-4. Other users open:
-
-```text
-http://YOUR_PC_IPV4:8000
-```
-
-If it does not open, Windows Firewall must allow inbound TCP port `8000`.
-Do not expose this directly to the public Internet without a VPN, tunnel, or
-reverse proxy.
+For a fixed employee URL, use the named Tunnel and token file above. The daily publish check starts a Quick Tunnel only when no named token file exists.
 
 ## Option C: Docker
 
-Use this when Docker Desktop is available and set to start with Windows.
+Run the app locally:
 
 ```powershell
 .\scripts\run_docker.ps1
 ```
 
-The compose file uses `restart: unless-stopped`, so Docker restarts the app automatically after Docker Desktop starts.
+The host port is bound to `127.0.0.1`, and Docker log files are capped at 10 MB with three retained files.
 
-## Notes
+To run the named Tunnel in Docker, first create `secrets\cloudflared-token` using the migration script above. In the Cloudflare Tunnel dashboard, set the service origin to `http://app:8000` for the Compose network. Then run:
 
-- The PC must be on.
-- The ATS app must be able to reach the ATS website from this PC.
-- If other employees need access from their PCs, expose this app through a company-approved tunnel, VPN, reverse proxy, or internal network address.
+```powershell
+docker compose --profile tunnel up -d --build
+docker compose --profile tunnel ps
+docker compose --profile tunnel exec cloudflared cloudflared --version
+docker compose --profile tunnel logs --tail=50 cloudflared
+```
+
+The Compose Tunnel image is pinned to `cloudflare/cloudflared:2026.10.5`. Do not configure its origin as `127.0.0.1:8000`: inside the connector container, localhost is the connector itself.
+
+## HTTPS origin certificate check
+
+The documented Windows and Docker origins use HTTP on a private local/Compose network. In that configuration there is no HTTPS origin certificate for `cloudflared` to validate. The public browser-to-Cloudflare connection is a separate TLS leg.
+
+If the Tunnel dashboard instead points to an `https://` origin, check that the certificate hostname matches the configured origin hostname and that the certificate chain is trusted. For diagnosis, inspect Tunnel logs for `x509: certificate is valid for ... not ...` (hostname mismatch) or `x509: certificate signed by unknown authority` (CA trust issue). Fix the hostname or CA chain; do not leave origin TLS verification disabled.
+
+## Data and log cleanup
+
+The automatic cleanup is limited to log rotation. Keep `data\parking_app.db` (application and audit history), `data\storage_state.json` (ATS login session), and screenshots until the owner-approved retention period is defined. They can contain operational evidence or credentials; do not delete them as part of a routine memory cleanup.
+
+## Daily health check
+
+Install the daily task if the PC should check the app and Tunnel at 9:00 AM while Windows is on:
+
+```powershell
+.\scripts\install_daily_publish_task.ps1 -ExpectedPublicUrl "https://YOUR-NAMED-HOSTNAME"
+```
+
+The script checks `/api/health`, starts the app if needed, checks Tunnel logs and emails an alert when SMTP is configured. A Quick Tunnel URL changes after a restart; a named Tunnel is required for a fixed URL.
+
+## Remove startup tasks
+
+```powershell
+.\scripts\uninstall_all_startup_tasks.ps1
+```
