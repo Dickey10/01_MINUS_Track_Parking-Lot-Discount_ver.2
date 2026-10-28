@@ -127,7 +127,8 @@ Set-Location $ProjectRoot
 
 $Port = Get-EnvValue "APP_PORT" "8000"
 $HealthUrl = "http://127.0.0.1:$Port/api/health"
-$TunnelToken = Get-EnvValue "CLOUDFLARE_TUNNEL_TOKEN"
+$TunnelSecretPath = Join-Path $ProjectRoot "secrets\cloudflared-token"
+$TunnelIsNamed = Test-Path $TunnelSecretPath
 
 Write-CheckLog "Daily publish check started."
 
@@ -151,7 +152,11 @@ if (Get-Process -Name "cloudflared" -ErrorAction SilentlyContinue) {
     Write-CheckLog "Existing cloudflared process detected. Reusing current tunnel session."
 } else {
     try {
-        & (Join-Path $ProjectRoot "scripts\start_cloudflare_tunnel.ps1")
+        if ($TunnelIsNamed) {
+            & (Join-Path $ProjectRoot "scripts\start_cloudflare_tunnel.ps1")
+        } else {
+            & (Join-Path $ProjectRoot "scripts\start_cloudflare_tunnel.ps1") -Quick
+        }
     } catch {
         $message = "Tunnel start script failed: $($_.Exception.Message)"
         Send-Alert -Subject "[MINUS Parking] Tunnel start failed" -Body $message
@@ -169,7 +174,7 @@ if ($TunnelErrors) {
     throw "Cloudflare tunnel error detected."
 }
 
-if (-not $TunnelToken -and -not $QuickTunnelUrl) {
+if (-not $TunnelIsNamed -and -not $QuickTunnelUrl) {
     $message = "No quick tunnel URL was found after restart. Check data/cloudflared.err.log."
     Send-Alert -Subject "[MINUS Parking] Missing quick tunnel URL" -Body $message
     throw $message
@@ -193,8 +198,8 @@ if ($QuickTunnelUrl) {
     Write-CheckLog "Public quick tunnel URL: $QuickTunnelUrl"
 }
 
-if ($TunnelToken) {
-    Write-CheckLog "Named Cloudflare tunnel token is configured."
+if ($TunnelIsNamed) {
+    Write-CheckLog "Named Cloudflare tunnel token file is configured."
 }
 
 Write-CheckLog "Daily publish check completed successfully."

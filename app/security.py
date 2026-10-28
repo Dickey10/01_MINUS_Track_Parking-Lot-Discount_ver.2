@@ -27,7 +27,9 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def _secret() -> bytes:
-    raw = settings.secret_key or settings.api_key or "change-this-secret-key"
+    raw = settings.secret_key.strip()
+    if len(raw) < 32:
+        raise RuntimeError("SECRET_KEY must be set to a unique random value of at least 32 characters.")
     return raw.encode()
 
 

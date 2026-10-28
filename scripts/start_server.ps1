@@ -13,6 +13,13 @@ $EnvPath = Join-Path $ProjectRoot ".env"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 Set-Location $ProjectRoot
 
+function Rotate-LogIfLarge {
+    param([string]$Path)
+    if ((Test-Path $Path) -and (Get-Item -LiteralPath $Path).Length -ge 10MB) {
+        Move-Item -LiteralPath $Path -Destination "$Path.1" -Force
+    }
+}
+
 function Get-EnvValue {
     param(
         [string]$Name,
@@ -40,6 +47,10 @@ try {
     "Server already healthy at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append -Encoding utf8
     exit 0
 } catch {
+}
+
+foreach ($path in @($LogPath, $OutLogPath, $ErrLogPath)) {
+    Rotate-LogIfLarge -Path $path
 }
 
 "Starting ATS Parking server at $(Get-Date -Format s)" | Out-File -FilePath $LogPath -Append -Encoding utf8

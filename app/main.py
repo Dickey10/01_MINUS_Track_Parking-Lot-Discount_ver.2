@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -56,6 +57,8 @@ async def unhandled_exception_handler(_, exc: Exception):
 
 @app.on_event("startup")
 async def startup() -> None:
+    if len(settings.secret_key.strip()) < 32 or settings.secret_key == "replace-with-a-long-random-secret":
+        raise RuntimeError("Set SECRET_KEY to a unique random value of at least 32 characters before starting the app.")
     init_db()
 
 
@@ -841,7 +844,9 @@ async def delete_ats_discount(req: ATSDiscountDeleteRequest, user: dict = Depend
 
 @app.post("/register", response_model=RegisterResponse)
 async def legacy_register(req: RegisterRequest, x_api_key: Annotated[str, Header()] = ""):
-    if settings.api_key and x_api_key != settings.api_key:
+    if not settings.api_key:
+        raise HTTPException(status_code=503, detail="Legacy registration endpoint is disabled.")
+    if not hmac.compare_digest(x_api_key, settings.api_key):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     async with _ats_lock:
         return await registrar.run(req)
