@@ -5,6 +5,7 @@ data/screenshots/
 data/*.db
 data/*.db-*
 data/*.log
+secrets/
 __pycache__/
 *.pyc
 .venv/
