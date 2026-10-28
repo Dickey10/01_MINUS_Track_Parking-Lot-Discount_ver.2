@@ -8,7 +8,7 @@ Write-Host "  MINUS Track Parking Discount Auto Setup"
 Write-Host "============================================"
 Write-Host ""
 
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$ProjectRoot = $PSScriptRoot
 $EnvPath = Join-Path $ProjectRoot ".env"
 if (Test-Path $EnvPath) {
     throw "An existing .env file was found. Setup stops to protect current credentials and settings. Back it up and edit it manually if you intend to change them."
