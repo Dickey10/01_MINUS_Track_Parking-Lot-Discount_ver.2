@@ -40,9 +40,10 @@ $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $acl = New-Object System.Security.AccessControl.FileSecurity
 $acl.SetOwner([System.Security.Principal.NTAccount]$identity)
 $acl.SetAccessRuleProtection($true, $false)
-$rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+$rights = [System.Security.AccessControl.FileSystemRights]::Read -bor [System.Security.AccessControl.FileSystemRights]::Write
+$rule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule -ArgumentList @(
     $identity,
-    [System.Security.AccessControl.FileSystemRights]::Read -bor [System.Security.AccessControl.FileSystemRights]::Write,
+    $rights,
     [System.Security.AccessControl.AccessControlType]::Allow
 )
 $acl.AddAccessRule($rule)
